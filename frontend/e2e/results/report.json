@@ -1,0 +1,1222 @@
+{
+  "timestamp": "2026-07-11T16:48:51.768Z",
+  "baseUrl": "http://localhost:5173",
+  "items": [
+    {
+      "id": "AUTH-1",
+      "name": "Signup via Phone OTP",
+      "status": "Working",
+      "howTested": "Playwright signup flow with dev_otp",
+      "endpoint": "POST /api/v1/auth/otp/send, /auth/otp/verify",
+      "screenshot": "e2e/results/01-after-signup.png"
+    },
+    {
+      "id": "HOME-1",
+      "name": "Home page loads",
+      "status": "Working",
+      "howTested": "Navigate /app",
+      "endpoint": "GET /dashboard/stats, /activity, /scam-alerts",
+      "screenshot": "e2e/results/02-home.png"
+    },
+    {
+      "id": "HOME-QA-Scan QR",
+      "name": "Quick action: Scan QR",
+      "status": "Working",
+      "howTested": "Click \"Scan QR\"",
+      "url": "http://localhost:5173/app/scan"
+    },
+    {
+      "id": "HOME-QA-Check UPI",
+      "name": "Quick action: Check UPI",
+      "status": "Working",
+      "howTested": "Click \"Check UPI\"",
+      "url": "http://localhost:5173/app/scan?tab=upi"
+    },
+    {
+      "id": "HOME-QA-Phone",
+      "name": "Quick action: Phone",
+      "status": "Working",
+      "howTested": "Click \"Phone\"",
+      "url": "http://localhost:5173/app/scan?tab=phone"
+    },
+    {
+      "id": "HOME-QA-Report",
+      "name": "Quick action: Report",
+      "status": "Working",
+      "howTested": "Click \"Report\"",
+      "url": "http://localhost:5173/app/alerts"
+    },
+    {
+      "id": "HOME-2",
+      "name": "Recent Activity View All",
+      "status": "Working",
+      "howTested": "Click View All under Recent Activity",
+      "url": "http://localhost:5173/app/activity"
+    },
+    {
+      "id": "HOME-3",
+      "name": "Scam Alerts View All",
+      "status": "Working",
+      "howTested": "Click View All under Scam Alerts",
+      "url": "http://localhost:5173/app/scam-alerts"
+    },
+    {
+      "id": "NAV-Home",
+      "name": "Bottom nav: Home",
+      "status": "Working",
+      "url": "http://localhost:5173/app"
+    },
+    {
+      "id": "NAV-Scan",
+      "name": "Bottom nav: Scan",
+      "status": "Working",
+      "url": "http://localhost:5173/app/scan"
+    },
+    {
+      "id": "NAV-SMS",
+      "name": "Bottom nav: SMS",
+      "status": "Working",
+      "url": "http://localhost:5173/app/sms"
+    },
+    {
+      "id": "NAV-Alerts",
+      "name": "Bottom nav: Alerts",
+      "status": "Working",
+      "url": "http://localhost:5173/app/alerts"
+    },
+    {
+      "id": "NAV-Profile",
+      "name": "Bottom nav: Profile",
+      "status": "Working",
+      "url": "http://localhost:5173/app/profile"
+    },
+    {
+      "id": "SCAN-QR Code",
+      "name": "Scan: QR Code",
+      "status": "Working",
+      "endpoint": "POST /api/v1/scans/analyze",
+      "response": {
+        "status": 200,
+        "decision": "approve",
+        "risk_score": 24.75,
+        "transaction_id": "6a546229-8c29-4a40-9d54-3115384ea947"
+      },
+      "screenshot": "e2e/results/03-scan-qr-code.png"
+    },
+    {
+      "id": "SCAN-SMS",
+      "name": "Scan: SMS",
+      "status": "Working",
+      "endpoint": "POST /api/v1/scans/analyze",
+      "response": {
+        "status": 200,
+        "decision": "hold",
+        "risk_score": 51,
+        "transaction_id": "30172013-8256-4817-abbc-e2de785fbf4f"
+      },
+      "screenshot": "e2e/results/03-scan-sms.png"
+    },
+    {
+      "id": "SCAN-UPI ID",
+      "name": "Scan: UPI ID",
+      "status": "Working",
+      "endpoint": "POST /api/v1/scans/analyze",
+      "response": {
+        "status": 200,
+        "decision": "approve",
+        "risk_score": 8.55,
+        "transaction_id": "4c88c456-2a25-4a0f-b898-fd0593660ba9"
+      },
+      "screenshot": "e2e/results/03-scan-upi-id.png"
+    },
+    {
+      "id": "SCAN-Phone No.",
+      "name": "Scan: Phone No.",
+      "status": "Working",
+      "endpoint": "POST /api/v1/scans/analyze",
+      "response": {
+        "status": 200,
+        "decision": "approve",
+        "risk_score": 10.95,
+        "transaction_id": "1ab26fa4-cdb6-4204-9acb-67af5842a0cf"
+      },
+      "screenshot": "e2e/results/03-scan-phone-no..png"
+    },
+    {
+      "id": "SCAN-Link",
+      "name": "Scan: Link",
+      "status": "Working",
+      "endpoint": "POST /api/v1/scans/analyze",
+      "response": {
+        "status": 200,
+        "decision": "block",
+        "risk_score": 76.7,
+        "transaction_id": "d8e36d6c-46b9-4546-8fae-b18315267106"
+      },
+      "screenshot": "e2e/results/03-scan-link.png"
+    },
+    {
+      "id": "SCAN-CAMERA",
+      "name": "QR camera",
+      "status": "Partially Working",
+      "howTested": "Click Scan with camera",
+      "note": "Headless may lack camera hardware; manual paste works",
+      "screenshot": "e2e/results/04-qr-camera.png"
+    },
+    {
+      "id": "SCAN-EMPTY",
+      "name": "Empty scan error",
+      "status": "Working"
+    },
+    {
+      "id": "ALERTS-WS",
+      "name": "WebSocket indicator",
+      "status": "Working",
+      "screenshot": "e2e/results/05-alerts.png"
+    },
+    {
+      "id": "ALERTS-LIST",
+      "name": "Alerts list after scan",
+      "status": "Working",
+      "scanDecision": "block",
+      "alert_id": "c1c20f6d-3da8-4d0c-8d9c-834984b9d698",
+      "endpoint": "POST /scans/analyze, GET /alerts"
+    },
+    {
+      "id": "ALERTS-READ",
+      "name": "Mark all read",
+      "status": "Working",
+      "endpoint": "POST /api/v1/alerts/mark-all-read"
+    },
+    {
+      "id": "SMS-1",
+      "name": "SMS search + filter",
+      "status": "Working",
+      "screenshot": "e2e/results/07-sms.png"
+    },
+    {
+      "id": "PROFILE-1",
+      "name": "Protection History link",
+      "status": "Working"
+    },
+    {
+      "id": "AUTH-LOGOUT",
+      "name": "Sign out",
+      "status": "Working",
+      "endpoint": "POST /auth/logout",
+      "screenshot": "e2e/results/08-logout.png"
+    },
+    {
+      "id": "AUTH-PERSIST",
+      "name": "Session persistence",
+      "status": "Working",
+      "howTested": "Reload after login; token in localStorage; home visible",
+      "profilePatchStatus": 200
+    },
+    {
+      "id": "AUTH-NAV",
+      "name": "Login → Signup link",
+      "status": "Working",
+      "howTested": "Sign out first, then footer Sign up link on login"
+    },
+    {
+      "id": "RESP-DESKTOP",
+      "name": "Desktop login layout",
+      "status": "Working",
+      "screenshot": "e2e/results/09-desktop-login.png"
+    },
+    {
+      "id": "RESP-TABLET",
+      "name": "Tablet login layout",
+      "status": "Working",
+      "screenshot": "e2e/results/10-tablet-login.png"
+    }
+  ],
+  "consoleErrors": [
+    "[mobile] Failed to load resource: the server responded with a status of 403 ()",
+    "[desktop] Failed to load resource: the server responded with a status of 403 ()"
+  ],
+  "failedRequests": [
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "failure": "net::ERR_ABORTED",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "failure": "net::ERR_ABORTED",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "failure": "net::ERR_ABORTED",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "failure": "net::ERR_ABORTED",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "failure": "net::ERR_ABORTED",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "failure": "net::ERR_ABORTED",
+      "viewport": "mobile"
+    }
+  ],
+  "networkLog": [
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/otp/send",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/otp/verify",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/profile",
+      "status": 200,
+      "method": "PATCH",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/sms/scans",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/sms/scans",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/scans/analyze",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/scans/analyze",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/scans/analyze",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/scans/analyze",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/scans/analyze",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/scans/analyze",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/alerts/mark-all-read",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/sms/scans",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/sms/scans",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/biometric/status",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/biometric/status",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/biometric/status",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/biometric/status",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/logout",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/otp/send",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/otp/verify",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/profile",
+      "status": 200,
+      "method": "PATCH",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/scam-alerts",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/activity",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/biometric/status",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/dashboard/stats",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/biometric/status",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/logout",
+      "status": 200,
+      "method": "POST",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "mobile"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "desktop"
+    },
+    {
+      "url": "http://localhost:5173/api/v1/auth/config",
+      "status": 200,
+      "method": "GET",
+      "viewport": "desktop"
+    }
+  ],
+  "summary": {
+    "working": 29,
+    "partial": 1,
+    "broken": 0,
+    "consoleErrorCount": 2,
+    "failedRequestCount": 6
+  }
+}
