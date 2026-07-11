@@ -4,7 +4,14 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+# Environment files (never commit real secrets)
 .env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+!.env.example
+!**/.env.example
 
 # ML artifacts (generated on first run)
 backend/app/ml/artifacts/
