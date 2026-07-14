@@ -32,10 +32,10 @@ export function GoogleSignInButton({
 
   if (!clientId) return null;
 
-  const handleClick = () => {
+  const handleClick = async () => {
     setLoading(true);
     try {
-      startGoogleOAuth(intent);
+      await startGoogleOAuth(intent);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Could not start Google sign-in';
       onError?.(msg);

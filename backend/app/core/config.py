@@ -70,7 +70,7 @@ class Settings(BaseSettings):
 
     @property
     def google_redirect_ready(self) -> bool:
-        return bool(self.google_client_id)
+        return bool(self.google_client_id and self.google_client_secret)
 
     @property
     def webauthn_rp_id(self) -> str:

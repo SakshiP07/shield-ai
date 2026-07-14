@@ -1,61 +1,122 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../hooks/AuthContext';
 import { useToast } from '../hooks/ToastContext';
-import { ApiError } from '../lib/api';
-import { consumeStoredGoogleOAuth, readGoogleOAuthCallbackHash } from '../lib/googleRedirect';
+import { ApiError, api } from '../lib/api';
+import {
+  clearStoredGoogleOAuth,
+  peekStoredGoogleOAuth,
+  readGoogleOAuthCallback,
+} from '../lib/googleRedirect';
+
+type CallbackResult =
+  | { ok: true; idToken: string; intent: 'login' | 'signup' | 'link' }
+  | { ok: false; message: string };
+
+// Module-level so React Strict Mode double-mount shares one exchange.
+let pendingCallback: Promise<CallbackResult> | null = null;
+
+function resolveGoogleCallback(search: string, hash: string): Promise<CallbackResult> {
+  if (!pendingCallback) {
+    const run = (async (): Promise<CallbackResult> => {
+      try {
+        const { code, idToken, state, error: oauthError } = readGoogleOAuthCallback(search, hash);
+        if (oauthError) {
+          return {
+            ok: false,
+            message: oauthError === 'access_denied' ? 'Google sign-in was cancelled.' : oauthError,
+          };
+        }
+
+        const stored = peekStoredGoogleOAuth();
+
+        if (code) {
+          if (!state || !stored.state || stored.state !== state) {
+            return { ok: false, message: 'OAuth state mismatch. Please try again from the login page.' };
+          }
+          if (!stored.codeVerifier || !stored.redirectUri) {
+            return { ok: false, message: 'OAuth session missing. Please try again from the login page.' };
+          }
+
+          const { id_token } = await api.googleExchange({
+            code,
+            code_verifier: stored.codeVerifier,
+            redirect_uri: stored.redirectUri,
+            state,
+            intent: stored.intent,
+          });
+          clearStoredGoogleOAuth();
+          return { ok: true, idToken: id_token, intent: stored.intent };
+        }
+
+        if (idToken) {
+          clearStoredGoogleOAuth();
+          return { ok: true, idToken, intent: stored.intent };
+        }
+
+        return {
+          ok: false,
+          message:
+            'Google did not return an auth code. Close this tab, hard-refresh http://localhost:5173/login, then try Google again.',
+        };
+      } catch (err) {
+        clearStoredGoogleOAuth();
+        return {
+          ok: false,
+          message: err instanceof ApiError ? err.message : 'Google sign-in failed. Please try again.',
+        };
+      }
+    })();
+
+    pendingCallback = run;
+    void run.finally(() => {
+      if (pendingCallback === run) pendingCallback = null;
+    });
+  }
+  return pendingCallback;
+}
 
 export function GoogleCallbackPage() {
   const { googleLogin, linkGoogle } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [error, setError] = useState('');
+  const urlRef = useRef({ search: window.location.search, hash: window.location.hash });
 
   useEffect(() => {
-    let cancelled = false;
+    let alive = true;
 
-    async function complete() {
-      const { idToken, state, error: oauthError } = readGoogleOAuthCallbackHash();
-      if (oauthError) {
-        if (!cancelled) setError(oauthError === 'access_denied' ? 'Google sign-in was cancelled.' : oauthError);
-        return;
-      }
+    (async () => {
+      const result = await resolveGoogleCallback(urlRef.current.search, urlRef.current.hash);
+      if (!alive) return;
 
-      const stored = consumeStoredGoogleOAuth();
-
-      if (!idToken) {
-        if (!cancelled) setError('Google did not return a sign-in token. Please try again.');
-        return;
-      }
-      if (!state || !stored.state || stored.state !== state) {
-        if (!cancelled) setError('OAuth state mismatch. Please try again.');
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
 
       try {
-        if (cancelled) return;
-
-        if (stored.intent === 'link') {
-          await linkGoogle(idToken);
+        if (result.intent === 'link') {
+          await linkGoogle(result.idToken);
+          if (!alive) return;
           showToast('Google account linked', 'success');
           navigate('/app/profile', { replace: true });
           return;
         }
 
-        const needsProfile = await googleLogin(idToken, stored.intent);
-        showToast(stored.intent === 'signup' ? 'Account created successfully' : 'Welcome back', 'success');
+        const needsProfile = await googleLogin(result.idToken, result.intent);
+        if (!alive) return;
+        showToast(result.intent === 'signup' ? 'Account created successfully' : 'Welcome back', 'success');
         navigate(needsProfile ? '/setup' : '/app', { replace: true });
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'Google sign-in failed. Please try again.');
-        }
+        if (!alive) return;
+        setError(err instanceof ApiError ? err.message : 'Google sign-in failed. Please try again.');
       }
-    }
+    })();
 
-    complete();
     return () => {
-      cancelled = true;
+      alive = false;
     };
   }, [googleLogin, linkGoogle, navigate, showToast]);
 
