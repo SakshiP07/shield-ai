@@ -1,0 +1,18 @@
+{
+  "name": "shield-ai-backend",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "prisma:validate": "prisma validate",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:studio": "prisma studio"
+  },
+  "devDependencies": {
+    "dotenv": "^16.5.0",
+    "prisma": "^7.9.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.9.0"
+  }
+}

@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, PhoneOff, Lock, Cpu, Bell, Activity, Star, LogOut, Loader2, KeyRound, ChevronRight, Pencil, Plus } from 'lucide-react';
+import { Shield, PhoneOff, Lock, Cpu, Bell, Activity, Star, LogOut, Loader2, ChevronRight, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AccountLinkSection } from '../../components/AccountLinkSection';
 import { MobileCard, MobilePage } from '../../components/mobile/MobilePage';
 import { UserAvatar } from '../../components/mobile/UserAvatar';
 import { useAuth } from '../../hooks/AuthContext';
-import { useBiometricAuth } from '../../hooks/useBiometricAuth';
-import { useToast } from '../../hooks/ToastContext';
 import { api, type DashboardStats, type UserPreferences } from '../../lib/api';
-import { BiometricAuthError } from '../../lib/biometric';
 import { riskLabel } from '../../lib/format';
 
 type ProfileRow = {
@@ -95,45 +92,21 @@ function buildSections(
 }
 
 export function ProfilePage() {
-  const { user, signOut, registerBiometric } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const { showToast } = useToast();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [prefs, setPrefs] = useState<UserPreferences | null>(null);
   const [loading, setLoading] = useState(true);
-  const [biometricStatus, setBiometricStatus] = useState<{ registered: boolean; credential_count: number } | null>(null);
-  const [biometricServerEnabled, setBiometricServerEnabled] = useState(false);
-  const [registeringBiometric, setRegisteringBiometric] = useState(false);
-  const { canUseBiometrics, unavailableMessage } = useBiometricAuth(biometricServerEnabled);
 
   useEffect(() => {
-    Promise.all([api.dashboardStats(), api.biometricStatus(), api.getPreferences()])
-      .then(([dashboardStats, status, preferences]) => {
+    Promise.all([api.dashboardStats(), api.getPreferences()])
+      .then(([dashboardStats, preferences]) => {
         setStats(dashboardStats);
-        setBiometricServerEnabled(status.server_enabled);
-        setBiometricStatus({ registered: status.registered, credential_count: status.credential_count });
         setPrefs(preferences);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
-
-  const handleEnableBiometric = async () => {
-    setRegisteringBiometric(true);
-    try {
-      await registerBiometric(`${user?.name || 'ShieldAI'} device`);
-      setBiometricStatus((prev) => ({
-        registered: true,
-        credential_count: (prev?.credential_count ?? 0) + 1,
-      }));
-      showToast('Passkey created', 'success');
-    } catch (err) {
-      const msg = err instanceof BiometricAuthError ? err.message : 'Could not create passkey';
-      showToast(msg, 'error');
-    } finally {
-      setRegisteringBiometric(false);
-    }
-  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -196,52 +169,6 @@ export function ProfilePage() {
       </MobileCard>
 
       {user && <AccountLinkSection user={user} />}
-
-      <div className="mb-6">
-        <p className="mb-2.5 text-[13px] font-semibold uppercase tracking-wider text-slate-500">Passkey Sign-In</p>
-        <div className="overflow-hidden rounded-3xl bg-surface-card px-5 py-5">
-          <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-500/15">
-              <KeyRound className="h-[18px] w-[18px] text-blue-400" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-semibold text-white">Passkeys</p>
-              <p className="mt-1.5 text-[14px] leading-relaxed text-slate-400">
-                {biometricStatus?.registered
-                  ? `${biometricStatus.credential_count} passkey${biometricStatus.credential_count === 1 ? '' : 's'} registered for your account.`
-                  : canUseBiometrics
-                    ? 'Create a passkey secured by your device screen lock or biometric verification.'
-                    : unavailableMessage}
-              </p>
-              {canUseBiometrics && (
-                <button
-                  type="button"
-                  onClick={handleEnableBiometric}
-                  disabled={registeringBiometric}
-                  className="mt-3 inline-flex h-10 w-fit min-w-[180px] max-w-[220px] shrink-0 items-center justify-center gap-1.5 self-start whitespace-nowrap rounded-xl border border-blue-500/35 bg-blue-500/[0.06] px-4 text-[14px] font-medium text-blue-400 transition hover:border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-300 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
-                >
-                  {registeringBiometric ? (
-                    <>
-                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                      <span>Creating...</span>
-                    </>
-                  ) : biometricStatus?.registered ? (
-                    <>
-                      <Plus className="h-4 w-4 shrink-0 stroke-[2.5]" />
-                      <span>Add another passkey</span>
-                    </>
-                  ) : (
-                    <>
-                      <KeyRound className="h-4 w-4 shrink-0" />
-                      <span>Create a passkey</span>
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
 
       {sections.map((section) => (
         <div key={section.title} className="mb-6">

@@ -62,11 +62,6 @@ export interface User {
   phone: string | null;
   email: string | null;
   google_id: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  email_verified: boolean | null;
-  locale: string | null;
-  hosted_domain: string | null;
   avatar_url: string | null;
   plan: string;
   profile_completed: boolean;
@@ -74,7 +69,10 @@ export interface User {
 }
 
 export interface AuthResponse {
+  success?: boolean;
+  isNewUser?: boolean;
   access_token: string;
+  token?: string;
   token_type: string;
   user: User;
   needs_profile: boolean;
@@ -94,7 +92,6 @@ export interface AuthConfig {
   google_redirect_uri: string;
   sms_enabled: boolean;
   otp_delivery: string;
-  biometric_enabled: boolean;
 }
 
 export interface DashboardStats {
@@ -198,6 +195,40 @@ export interface ScanResult {
   alert_id: string | null;
 }
 
+export interface LedgerEntry {
+  id: string;
+  transaction_id: string;
+  phone_number: string | null;
+  upi_id: string | null;
+  created_at: string;
+  fraud_score: number;
+  risk_level: string;
+  status: string;
+  reason: string;
+  model_version: string;
+  processing_time_ms: number;
+  device_id: string | null;
+  scan_source: string;
+}
+
+export interface LedgerListResponse {
+  items: LedgerEntry[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+function getOrCreateDeviceId(): string {
+  const key = 'shieldai_device_id';
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
 export const api = {
   authConfig: () => request<AuthConfig>('/auth/config'),
 
@@ -210,28 +241,10 @@ export const api = {
       body: JSON.stringify({ phone, otp, intent }),
     }),
 
-  googleLogin: (id_token: string, intent: 'login' | 'signup' | 'continue' = 'continue') =>
+  googleLogin: (access_token: string) =>
     request<AuthResponse>('/auth/google', {
       method: 'POST',
-      body: JSON.stringify({ id_token, intent }),
-    }),
-
-  googlePrepare: (data: { intent: 'login' | 'signup' | 'link'; redirect_uri: string }) =>
-    request<{ state: string }>('/auth/google/prepare', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  googleExchange: (data: {
-    code: string;
-    code_verifier: string;
-    redirect_uri: string;
-    state: string;
-    intent: 'login' | 'signup' | 'link';
-  }) =>
-    request<{ id_token: string }>('/auth/google/exchange', {
-      method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ access_token, intent: 'continue' }),
     }),
 
   linkPhoneSendOtp: (phone: string) =>
@@ -246,14 +259,35 @@ export const api = {
       body: JSON.stringify({ phone, otp }),
     }),
 
-  linkGoogle: (id_token: string) =>
+  linkGoogle: (access_token: string) =>
     request<User>('/auth/link/google', {
       method: 'POST',
-      body: JSON.stringify({ id_token }),
+      body: JSON.stringify({ access_token }),
     }),
 
   updateProfile: (data: { name?: string; avatar_url?: string }) =>
     request<User>('/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
+
+  uploadAvatar: async (file: File) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('file', file);
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/auth/avatar`, { method: 'POST', headers, body: form });
+    if (res.status === 401 && token) {
+      clearToken();
+      unauthorizedHandler?.();
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const detail = body.detail;
+      const message =
+        typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: { msg?: string }) => d.msg).join(', ') : res.statusText;
+      throw new ApiError(message, res.status);
+    }
+    return res.json() as Promise<User>;
+  },
 
   getPreferences: () => request<UserPreferences>('/auth/preferences'),
 
@@ -280,43 +314,6 @@ export const api = {
 
   logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
 
-  biometricStatus: () => request<{ server_enabled: boolean; registered: boolean; credential_count: number }>('/auth/biometric/status'),
-
-  biometricRegisterOptions: () => {
-    const ctx = typeof window !== 'undefined' ? { rp_id: window.location.hostname, origin: window.location.origin } : {};
-    return request<Record<string, unknown>>('/auth/biometric/register/options', {
-      method: 'POST',
-      body: JSON.stringify(ctx),
-    });
-  },
-
-  biometricRegisterVerify: (credential: Record<string, unknown>, device_label?: string) => {
-    const ctx = typeof window !== 'undefined' ? { rp_id: window.location.hostname, origin: window.location.origin } : {};
-    return request<{ registered: boolean; device_label: string; credential_id: string }>(
-      '/auth/biometric/register/verify',
-      {
-        method: 'POST',
-        body: JSON.stringify({ credential, device_label, ...ctx }),
-      },
-    );
-  },
-
-  biometricLoginOptions: (credential_ids: string[] = []) => {
-    const ctx = typeof window !== 'undefined' ? { rp_id: window.location.hostname, origin: window.location.origin } : {};
-    return request<Record<string, unknown> & { session_id: string }>('/auth/biometric/login/options', {
-      method: 'POST',
-      body: JSON.stringify({ credential_ids, ...ctx }),
-    });
-  },
-
-  biometricLoginVerify: (session_id: string, credential: Record<string, unknown>) => {
-    const ctx = typeof window !== 'undefined' ? { rp_id: window.location.hostname, origin: window.location.origin } : {};
-    return request<AuthResponse>('/auth/biometric/login/verify', {
-      method: 'POST',
-      body: JSON.stringify({ session_id, credential, ...ctx }),
-    });
-  },
-
   dashboardStats: () => request<DashboardStats>('/dashboard/stats'),
 
   dashboardActivity: () => request<ActivityItem[]>('/dashboard/activity'),
@@ -331,9 +328,32 @@ export const api = {
         content,
         amount,
         sender,
-        device_info: { userAgent: navigator.userAgent, platform: navigator.platform },
+        device_info: {
+          device_id: getOrCreateDeviceId(),
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+        },
       }),
     }),
+
+  ledger: (params: {
+    phone?: string;
+    upi?: string;
+    status?: 'succeeded' | 'failed' | 'pending';
+    risk_level?: 'high' | 'medium' | 'low';
+    page?: number;
+    page_size?: number;
+  } = {}) => {
+    const q = new URLSearchParams();
+    if (params.phone) q.set('phone', params.phone);
+    if (params.upi) q.set('upi', params.upi);
+    if (params.status) q.set('status', params.status);
+    if (params.risk_level) q.set('risk_level', params.risk_level);
+    if (params.page) q.set('page', String(params.page));
+    if (params.page_size) q.set('page_size', String(params.page_size));
+    const qs = q.toString();
+    return request<LedgerListResponse>(`/ledger${qs ? `?${qs}` : ''}`);
+  },
 
   alerts: () => request<AlertItem[]>('/alerts'),
 

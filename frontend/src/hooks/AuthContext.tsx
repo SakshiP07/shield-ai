@@ -8,14 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { api, clearToken, setToken, setUnauthorizedHandler, type User } from '../lib/api';
-import {
-  clearLocalPasskeyHints,
-  createBiometricCredential,
-  getBiometricAssertion,
-  getLocalPasskeyIds,
-  markBiometricRegisteredLocally,
-} from '../lib/biometric';
-import { isStoredTokenUsable, purgeInvalidStoredToken, clearGoogleOriginFailed } from '../lib/session';
+import { isStoredTokenUsable, purgeInvalidStoredToken } from '../lib/session';
 
 export type { User };
 
@@ -25,17 +18,16 @@ interface AuthContextValue {
   needsProfile: boolean;
   sendOtp: (phone: string) => Promise<{ message: string; sms_sent: boolean; dev_otp?: string | null }>;
   verifyOtp: (phone: string, otp: string, intent?: 'login' | 'signup' | 'continue') => Promise<boolean>;
-  googleLogin: (idToken: string, intent?: 'login' | 'signup' | 'continue') => Promise<boolean>;
-  biometricLogin: () => Promise<boolean>;
-  registerBiometric: (deviceLabel?: string) => Promise<void>;
+  googleLogin: (accessToken: string) => Promise<{ needsProfile: boolean; isNewUser: boolean }>;
   linkPhone: {
     sendOtp: (phone: string) => Promise<{ message: string; dev_otp?: string | null }>;
     verify: (phone: string, otp: string) => Promise<void>;
   };
-  linkGoogle: (idToken: string) => Promise<void>;
+  linkGoogle: (accessToken: string) => Promise<void>;
   refreshUser: () => Promise<void>;
   completeProfile: (name: string) => Promise<void>;
   updateProfile: (data: { name?: string; avatar_url?: string }) => Promise<void>;
+  uploadAvatar: (file: File) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -97,33 +89,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.needs_profile;
   }, []);
 
-  const googleLogin = useCallback(async (idToken: string, intent: 'login' | 'signup' | 'continue' = 'continue') => {
-    const res = await api.googleLogin(idToken, intent);
-    clearGoogleOriginFailed();
-    setToken(res.access_token);
+  const googleLogin = useCallback(async (accessToken: string) => {
+    const res = await api.googleLogin(accessToken);
+    const token = res.access_token || res.token;
+    if (!token) throw new Error('Google sign-in did not return a session token');
+    setToken(token);
     setUser(res.user);
     setNeedsProfile(res.needs_profile);
-    return res.needs_profile;
-  }, []);
-
-  const biometricLogin = useCallback(async () => {
-    const credentialIds = getLocalPasskeyIds();
-    const options = await api.biometricLoginOptions(credentialIds);
-    const sessionId = options.session_id;
-    const { session_id: _sessionId, ...requestOptions } = options;
-    const credential = await getBiometricAssertion(requestOptions);
-    const res = await api.biometricLoginVerify(sessionId, credential);
-    setToken(res.access_token);
-    setUser(res.user);
-    setNeedsProfile(res.needs_profile);
-    return res.needs_profile;
-  }, []);
-
-  const registerBiometric = useCallback(async (deviceLabel?: string) => {
-    const options = await api.biometricRegisterOptions();
-    const credential = await createBiometricCredential(options);
-    const result = await api.biometricRegisterVerify(credential, deviceLabel);
-    markBiometricRegisteredLocally(true, result.credential_id);
+    return { needsProfile: res.needs_profile, isNewUser: Boolean(res.isNewUser) };
   }, []);
 
   const linkPhone = useMemo(
@@ -142,8 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const linkGoogle = useCallback(async (idToken: string) => {
-    const updated = await api.linkGoogle(idToken);
+  const linkGoogle = useCallback(async (accessToken: string) => {
+    const updated = await api.linkGoogle(accessToken);
     setUser(updated);
   }, []);
 
@@ -165,6 +138,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.name) setNeedsProfile(false);
   }, []);
 
+  const uploadAvatar = useCallback(async (file: File) => {
+    const updated = await api.uploadAvatar(file);
+    setUser(updated);
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       await api.logout();
@@ -172,7 +150,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Local logout must still complete if the API is temporarily unreachable.
     }
     clearToken();
-    clearLocalPasskeyHints();
     setUser(null);
     setNeedsProfile(false);
   }, []);
@@ -185,16 +162,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendOtp,
       verifyOtp,
       googleLogin,
-      biometricLogin,
-      registerBiometric,
       linkPhone,
       linkGoogle,
       refreshUser,
       completeProfile,
       updateProfile,
+      uploadAvatar,
       signOut,
     }),
-    [user, loading, needsProfile, sendOtp, verifyOtp, googleLogin, biometricLogin, registerBiometric, linkPhone, linkGoogle, refreshUser, completeProfile, updateProfile, signOut],
+    [
+      user,
+      loading,
+      needsProfile,
+      sendOtp,
+      verifyOtp,
+      googleLogin,
+      linkPhone,
+      linkGoogle,
+      refreshUser,
+      completeProfile,
+      updateProfile,
+      uploadAvatar,
+      signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

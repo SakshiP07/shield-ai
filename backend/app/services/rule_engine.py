@@ -2,7 +2,7 @@
 
 from dataclasses import asdict, dataclass
 
-from app.services.velocity import VelocityResult, check_velocity
+from app.services.velocity import VelocityResult
 
 # Configurable rule thresholds (move to DB/config in production)
 RULES = {
@@ -43,20 +43,17 @@ class RuleEvaluation:
 
 def evaluate_rules(
     *,
-    user_id: str,
+    user_id: str,  # noqa: ARG001 — reserved for future per-user rule overrides
     amount: float,
     content: str,
     channel: str,
     merchant_trust: float,
     behaviour_flags: list[str],
-    velocity: VelocityResult | None = None,
+    velocity: VelocityResult,
 ) -> RuleEvaluation:
     results: list[RuleResult] = []
     content_lower = content.lower()
 
-    velocity = velocity or check_velocity(
-        user_id, amount, RULES["velocity_count_threshold"], RULES["velocity_amount_threshold"]
-    )
     results.append(
         RuleResult(
             rule_id="R001",

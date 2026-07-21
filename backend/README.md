@@ -1,12 +1,13 @@
 # ShieldAI Backend
 
-FastAPI backend for fraud detection, OTP auth, and real-time alerts.
+FastAPI backend for fraud detection, phone OTP auth, and real-time alerts.
 
 ## Stack
 
 - FastAPI + Uvicorn
-- SQLAlchemy + PostgreSQL
-- Redis (OTP, sessions, velocity, cache)
+- SQLAlchemy + PostgreSQL (via `DATABASE_URL` / Supabase)
+- Supabase Storage (existing `avatars` bucket)
+- Prisma (`backend/prisma`) for schema sync / client generate
 - JWT authentication
 - WebSockets (live alerts)
 - scikit-learn Random Forest (fraud scoring)
@@ -14,31 +15,29 @@ FastAPI backend for fraud detection, OTP auth, and real-time alerts.
 ## Quick start
 
 ```bash
-docker compose up -d
+cd backend
+cp .env.example .env   # fill all fields
+npm install
+npx prisma validate && npx prisma generate && npx prisma db push
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
 ## Environment
 
-Copy `.env.example` to `.env` and update `SECRET_KEY` before production.
+Single file: `.env` (template `.env.example`). Keys must match.
+
+Storage uses the existing public bucket named `avatars` (create/configure it yourself in the Supabase dashboard).
 
 ## Models
 
 | Table | Purpose |
 |-------|---------|
 | `users` | Phone-based accounts |
-| `transactions` | Scans and payment checks |
+| `transactions` | Scans and payment checks (indexed for velocity) |
 | `behaviour_profiles` | Security score, scan stats |
 | `merchants` | Known UPI/phone merchants |
 | `fraud_logs` | Alerts shown in Alert Center |
-
-## Redis keys
-
-- `otp:{phone}` — OTP codes (TTL)
-- `session:{user_id}` — Active session metadata
-- `recent_tx:{user_id}` — Recent transactions for velocity
-- `velocity:{user_id}` — Latest velocity check snapshot
-- `cache:{key}` — General API cache
+| `otp_codes` | Short-lived OTPs (replaces Redis) |
+| `revoked_tokens` | JWT denylist (replaces Redis) |

@@ -16,13 +16,9 @@ class User(Base):
     phone: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=True)
     google_id: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=True)
-    google_given_name: Mapped[str] = mapped_column(String(120), nullable=True)
-    google_family_name: Mapped[str] = mapped_column(String(120), nullable=True)
-    google_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=True)
-    google_locale: Mapped[str] = mapped_column(String(35), nullable=True)
-    google_hosted_domain: Mapped[str] = mapped_column(String(255), nullable=True)
     avatar_url: Mapped[str] = mapped_column(String(512), nullable=True)
-    auth_provider: Mapped[str] = mapped_column(String(20), default="phone")  # phone | google | linked
+    # phone | google | linked (both)
+    auth_provider: Mapped[str] = mapped_column(String(20), default="phone")
     profile_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     plan: Mapped[str] = mapped_column(String(50), default="Free Shield")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -36,9 +32,6 @@ class User(Base):
         "BehaviourProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
     fraud_logs = relationship("FraudLog", back_populates="user", cascade="all, delete-orphan")
-    webauthn_credentials = relationship(
-        "WebAuthnCredential", back_populates="user", cascade="all, delete-orphan"
-    )
     preferences = relationship(
         "UserPreference", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )

@@ -32,17 +32,3 @@ export function purgeInvalidStoredToken(): boolean {
   }
   return false;
 }
-
-export const GOOGLE_ORIGIN_FAILED_KEY = 'shieldai_google_oauth_origin_failed';
-
-export function markGoogleOriginFailed(): void {
-  sessionStorage.setItem(GOOGLE_ORIGIN_FAILED_KEY, '1');
-}
-
-export function clearGoogleOriginFailed(): void {
-  sessionStorage.removeItem(GOOGLE_ORIGIN_FAILED_KEY);
-}
-
-export function isGoogleOriginFailed(): boolean {
-  return sessionStorage.getItem(GOOGLE_ORIGIN_FAILED_KEY) === '1';
-}

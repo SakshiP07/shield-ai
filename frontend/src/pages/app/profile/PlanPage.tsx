@@ -21,7 +21,7 @@ export function PlanPage() {
           <li>AI-powered QR, SMS, UPI, and link scanning</li>
           <li>Real-time fraud alerts</li>
           <li>Behaviour and rule engine analysis</li>
-          <li>Passkey sign-in</li>
+          <li>Phone OTP sign-in</li>
         </ul>
       </MobileCard>
     </MobilePage>

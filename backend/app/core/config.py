@@ -14,8 +14,11 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     algorithm: str = "HS256"
 
-    database_url: str = "postgresql://shield:shield@127.0.0.1:5432/shieldai"
-    redis_url: str = "redis://127.0.0.1:6379/0"
+    # Supabase / PostgreSQL — only these connection env vars are required
+    database_url: str = ""
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+    supabase_service_role_key: str = ""
 
     otp_expire_seconds: int = 300
     otp_length: int = 6
@@ -26,27 +29,19 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
-    # SMS — MSG91 (recommended for India) or Twilio; leave empty for dev mode
     msg91_auth_key: str = ""
     msg91_template_id: str = ""
     msg91_sender_id: str = ""
     msg91_dlt_te_id: str = ""
     msg91_pe_id: str = ""
-    # DLT category: transactional OTP (Service Implicit). Suffix must match approved template.
     msg91_sms_suffix: str = "- TGSP"
 
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
 
-    # Google OAuth — get from Google Cloud Console
-    google_client_id: str = ""
-    google_client_secret: str = ""
+    # Google OAuth is handled by Supabase Auth; redirect URI is the frontend callback.
     google_redirect_uri: str = "http://localhost:5173/auth/google/callback"
-
-    # WebAuthn passkeys backed by a user-verifying platform authenticator
-    webauthn_rp_name: str = "ShieldAI"
-    webauthn_origin: str = "http://localhost:5173"
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -66,22 +61,16 @@ class Settings(BaseSettings):
 
     @property
     def google_enabled(self) -> bool:
-        return bool(self.google_client_id)
+        """Google sign-in is available when Supabase Auth credentials are set."""
+        return bool(self.supabase_url and self.supabase_anon_key)
 
     @property
     def google_redirect_ready(self) -> bool:
-        return bool(self.google_client_id and self.google_client_secret)
+        return self.google_enabled
 
     @property
-    def webauthn_rp_id(self) -> str:
-        from urllib.parse import urlparse
-
-        host = urlparse(self.webauthn_origin).hostname
-        return host or "localhost"
-
-    @property
-    def webauthn_enabled(self) -> bool:
-        return bool(self.webauthn_rp_id and self.webauthn_origin)
+    def supabase_enabled(self) -> bool:
+        return bool(self.supabase_url and self.supabase_service_role_key)
 
 
 @lru_cache

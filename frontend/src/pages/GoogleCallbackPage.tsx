@@ -1,80 +1,87 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/AuthContext';
 import { useToast } from '../hooks/ToastContext';
-import { ApiError, api } from '../lib/api';
+import { ApiError } from '../lib/api';
+import { takeOAuthIntent } from '../lib/googleRedirect';
+import { getSupabase } from '../lib/supabase';
 import {
-  clearStoredGoogleOAuth,
-  peekStoredGoogleOAuth,
-  readGoogleOAuthCallback,
-} from '../lib/googleRedirect';
+  getGoogleCallbackPromise,
+  setGoogleCallbackPromise,
+  type CallbackResult,
+} from '../lib/googleCallbackState';
 
-type CallbackResult =
-  | { ok: true; idToken: string; intent: 'login' | 'signup' | 'link' }
-  | { ok: false; message: string };
+function readUrlParams() {
+  const search = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(
+    window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash,
+  );
+  const get = (key: string) => search.get(key) || hash.get(key);
+  return {
+    code: get('code'),
+    error: get('error'),
+    errorDescription: get('error_description'),
+  };
+}
 
-// Module-level so React Strict Mode double-mount shares one exchange.
-let pendingCallback: Promise<CallbackResult> | null = null;
+async function resolveSupabaseCallback(): Promise<CallbackResult> {
+  try {
+    const { code, error: oauthError, errorDescription } = readUrlParams();
 
-function resolveGoogleCallback(search: string, hash: string): Promise<CallbackResult> {
-  if (!pendingCallback) {
-    const run = (async (): Promise<CallbackResult> => {
-      try {
-        const { code, idToken, state, error: oauthError } = readGoogleOAuthCallback(search, hash);
-        if (oauthError) {
-          return {
-            ok: false,
-            message: oauthError === 'access_denied' ? 'Google sign-in was cancelled.' : oauthError,
-          };
-        }
+    if (oauthError || errorDescription) {
+      return {
+        ok: false,
+        message:
+          oauthError === 'access_denied'
+            ? 'Google sign-in was cancelled.'
+            : errorDescription || oauthError || 'Google sign-in failed.',
+      };
+    }
 
-        const stored = peekStoredGoogleOAuth();
+    const supabase = getSupabase();
 
-        if (code) {
-          if (!state || !stored.state || stored.state !== state) {
-            return { ok: false, message: 'OAuth state mismatch. Please try again from the login page.' };
-          }
-          if (!stored.codeVerifier || !stored.redirectUri) {
-            return { ok: false, message: 'OAuth session missing. Please try again from the login page.' };
-          }
+    // detectSessionInUrl:true exchanges ?code= during client init — wait for that first.
+    {
+      const { data, error } = await supabase.auth.getSession();
+      if (data.session?.access_token) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return { ok: true, accessToken: data.session.access_token, intent: takeOAuthIntent() };
+      }
+      if (error) {
+        return { ok: false, message: error.message };
+      }
+    }
 
-          const { id_token } = await api.googleExchange({
-            code,
-            code_verifier: stored.codeVerifier,
-            redirect_uri: stored.redirectUri,
-            state,
-            intent: stored.intent,
-          });
-          clearStoredGoogleOAuth();
-          return { ok: true, idToken: id_token, intent: stored.intent };
-        }
-
-        if (idToken) {
-          clearStoredGoogleOAuth();
-          return { ok: true, idToken, intent: stored.intent };
-        }
-
+    // Fallback if init did not pick up the code (e.g. race on first paint).
+    if (code) {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      if (error || !data.session?.access_token) {
         return {
           ok: false,
-          message:
-            'Google did not return an auth code. Close this tab, hard-refresh http://localhost:5173/login, then try Google again.',
-        };
-      } catch (err) {
-        clearStoredGoogleOAuth();
-        return {
-          ok: false,
-          message: err instanceof ApiError ? err.message : 'Google sign-in failed. Please try again.',
+          message: error?.message || 'Google sign-in failed. Please try again from the login page.',
         };
       }
-    })();
+      return { ok: true, accessToken: data.session.access_token, intent: takeOAuthIntent() };
+    }
 
-    pendingCallback = run;
-    void run.finally(() => {
-      if (pendingCallback === run) pendingCallback = null;
-    });
+    return {
+      ok: false,
+      message: 'Google sign-in did not return a session. Please try again from the login page.',
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : 'Google sign-in failed. Please try again.',
+    };
   }
-  return pendingCallback;
+}
+
+function resolveSupabaseCallbackOnce(): Promise<CallbackResult> {
+  const existing = getGoogleCallbackPromise();
+  if (existing) return existing;
+  return setGoogleCallbackPromise(resolveSupabaseCallback());
 }
 
 export function GoogleCallbackPage() {
@@ -82,51 +89,60 @@ export function GoogleCallbackPage() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [error, setError] = useState('');
-  const urlRef = useRef({ search: window.location.search, hash: window.location.hash });
 
   useEffect(() => {
-    let alive = true;
+    let cancelled = false;
 
     (async () => {
-      const result = await resolveGoogleCallback(urlRef.current.search, urlRef.current.hash);
-      if (!alive) return;
+      const result = await resolveSupabaseCallbackOnce();
+      if (cancelled) return;
 
       if (!result.ok) {
         setError(result.message);
         return;
       }
 
+      const accessToken = result.accessToken;
       try {
         if (result.intent === 'link') {
-          await linkGoogle(result.idToken);
-          if (!alive) return;
+          await linkGoogle(accessToken);
+          if (cancelled) return;
           showToast('Google account linked', 'success');
           navigate('/app/profile', { replace: true });
-          return;
+        } else {
+          const { needsProfile, isNewUser } = await googleLogin(accessToken);
+          if (cancelled) return;
+          showToast(isNewUser ? 'Account created successfully' : 'Welcome back', 'success');
+          // Google users land on home; only incomplete profiles go to setup.
+          navigate(needsProfile ? '/setup' : '/app', { replace: true });
         }
-
-        const needsProfile = await googleLogin(result.idToken, result.intent);
-        if (!alive) return;
-        showToast(result.intent === 'signup' ? 'Account created successfully' : 'Welcome back', 'success');
-        navigate(needsProfile ? '/setup' : '/app', { replace: true });
       } catch (err) {
-        if (!alive) return;
-        setError(err instanceof ApiError ? err.message : 'Google sign-in failed. Please try again.');
+        if (!cancelled) {
+          setError(err instanceof ApiError ? err.message : 'Google sign-in failed. Please try again.');
+        }
+      }
+      // Keep Supabase session until after app login succeeds; then clear locally.
+      if (!cancelled) {
+        try {
+          await getSupabase().auth.signOut({ scope: 'local' });
+        } catch {
+          // App JWT is the source of truth.
+        }
       }
     })();
 
     return () => {
-      alive = false;
+      cancelled = true;
     };
   }, [googleLogin, linkGoogle, navigate, showToast]);
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-surface-base px-6 text-center">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface-base px-6 text-center">
         <p className="text-sm text-rose-400">{error}</p>
-        <Link to="/login" className="mt-4 text-sm font-medium text-blue-400 hover:text-blue-300">
-          Back to login
-        </Link>
+        <button type="button" className="btn-primary max-w-xs" onClick={() => navigate('/login', { replace: true })}>
+          Back to sign in
+        </button>
       </div>
     );
   }

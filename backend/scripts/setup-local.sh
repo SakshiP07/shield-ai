@@ -1,47 +1,30 @@
 #!/usr/bin/env bash
-# Local dev setup WITHOUT Docker (uses Homebrew PostgreSQL + Redis)
+# Optional helper: print next steps for Supabase-backed local setup.
+# Does NOT create Supabase resources, Docker containers, or Redis.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
 
-echo "==> Checking Redis..."
-if ! redis-cli ping >/dev/null 2>&1; then
-  echo "Redis is not running. Start it with: brew services start redis"
-  exit 1
-fi
-echo "    Redis OK"
-
-echo "==> Setting up PostgreSQL user/database..."
-PSQL_USER="${PGUSER:-$(whoami)}"
-psql -h 127.0.0.1 -U "$PSQL_USER" -d postgres -v ON_ERROR_STOP=1 <<'SQL'
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'shield') THEN
-    CREATE ROLE shield WITH LOGIN PASSWORD 'shield';
-  END IF;
-END
-$$;
-SELECT 'CREATE DATABASE shieldai OWNER shield' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'shieldai')\gexec
-GRANT ALL PRIVILEGES ON DATABASE shieldai TO shield;
-SQL
-
-psql -h 127.0.0.1 -U "$PSQL_USER" -d shieldai -v ON_ERROR_STOP=1 -c \
-  "GRANT ALL ON SCHEMA public TO shield; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO shield;"
-
-echo "==> Writing .env (if missing)..."
-if [[ ! -f .env ]]; then
-  cp .env.example .env
-fi
-# Prefer IPv4 to avoid localhost -> ::1 issues on some Mac setups
-if grep -q 'localhost:5432' .env 2>/dev/null; then
-  sed -i '' 's|@localhost:5432|@127.0.0.1:5432|g' .env
-fi
-
-echo "==> Testing connection..."
-psql "postgresql://shield:shield@127.0.0.1:5432/shieldai" -c "SELECT current_user, current_database();"
-
+echo "ShieldAI uses Supabase PostgreSQL + Storage."
 echo ""
-echo "Done! Start backend:"
-echo "  source .venv/bin/activate"
-echo "  uvicorn app.main:app --reload --port 8000"
+echo "1. Create/configure in the Supabase dashboard (manually):"
+echo "   - Project + Postgres database"
+echo "   - Public storage bucket named: avatars"
+echo ""
+echo "2. Env (single file):"
+echo "   cd \"$ROOT\" && cp .env.example .env"
+echo "   # Fill all fields — especially SUPABASE_* and DATABASE_URL"
+echo ""
+echo "3. Sync schema with Prisma (from backend):"
+echo "   cd \"$ROOT\""
+echo "   npm install"
+echo "   npx prisma validate && npx prisma generate && npx prisma db push"
+echo "   npx prisma studio   # optional: view tables"
+echo ""
+echo "4. Start backend:"
+echo "   cd \"$ROOT\""
+echo "   source .venv/bin/activate  # or create venv + pip install -r requirements.txt"
+echo "   uvicorn app.main:app --reload --port 8000"
+echo ""
+echo "5. Start frontend:"
+echo "   cd \"$ROOT/../frontend\" && npm install && npm run dev"

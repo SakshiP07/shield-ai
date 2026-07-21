@@ -6,7 +6,7 @@ import { MobileFrame } from '../mobile/MobileFrame';
 
 type AuthShellProps = {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   footer?: { text: string; linkText: string; linkTo: string };
   children: ReactNode;
 };
@@ -25,7 +25,7 @@ export function AuthShell({ title, subtitle, footer, children }: AuthShellProps)
 
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-6">
             <h1 className="text-2xl font-bold text-white">{title}</h1>
-            <p className="mt-2 text-sm leading-relaxed text-slate-400">{subtitle}</p>
+            {subtitle ? <p className="mt-2 text-sm leading-relaxed text-slate-400">{subtitle}</p> : null}
           </motion.div>
 
           <div className="flex-1">{children}</div>

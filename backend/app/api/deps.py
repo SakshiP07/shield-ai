@@ -19,7 +19,7 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     payload = decode_access_token(credentials.credentials)
-    if payload is None or "sub" not in payload or is_access_token_revoked(payload):
+    if payload is None or "sub" not in payload or is_access_token_revoked(db, payload):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     user = db.get(User, UUID(payload["sub"]))

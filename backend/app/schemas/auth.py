@@ -32,19 +32,17 @@ class UserResponse(BaseModel):
     phone: str | None = None
     email: str | None = None
     google_id: str | None = None
-    first_name: str | None = Field(default=None, validation_alias="google_given_name")
-    last_name: str | None = Field(default=None, validation_alias="google_family_name")
-    email_verified: bool | None = Field(default=None, validation_alias="google_email_verified")
-    locale: str | None = Field(default=None, validation_alias="google_locale")
-    hosted_domain: str | None = Field(default=None, validation_alias="google_hosted_domain")
     avatar_url: str | None = None
     plan: str
     profile_completed: bool = False
-    auth_provider: str = "phone"
+    auth_provider: str = "phone"  # phone | google | linked
 
 
 class AuthResponse(BaseModel):
+    success: bool = True
+    isNewUser: bool = False
     access_token: str
+    token: str = ""
     token_type: str = "bearer"
     user: UserResponse
     needs_profile: bool = False
@@ -66,7 +64,9 @@ class ProfileUpdate(BaseModel):
 
 
 class GoogleAuthRequest(BaseModel):
-    id_token: str
+    """Supabase Auth access token from Google OAuth (`signInWithOAuth`)."""
+
+    access_token: str = Field(..., min_length=20)
     intent: Literal["login", "signup", "continue"] = "continue"
 
 
@@ -76,28 +76,6 @@ class AuthConfigResponse(BaseModel):
     google_redirect_uri: str = ""
     sms_enabled: bool
     otp_delivery: str = "console"
-    biometric_enabled: bool = False
-
-
-class GoogleOAuthPrepareRequest(BaseModel):
-    intent: Literal["login", "signup", "link"] = "login"
-    redirect_uri: str = Field(..., min_length=8, max_length=512)
-
-
-class GoogleOAuthPrepareResponse(BaseModel):
-    state: str
-
-
-class GoogleOAuthExchangeRequest(BaseModel):
-    code: str = Field(..., min_length=1)
-    code_verifier: str = Field(..., min_length=43, max_length=128)
-    redirect_uri: str = Field(..., min_length=8, max_length=512)
-    state: str = Field(..., min_length=8, max_length=256)
-    intent: Literal["login", "signup", "link"] = "login"
-
-
-class GoogleOAuthExchangeResponse(BaseModel):
-    id_token: str
 
 
 class DashboardStats(BaseModel):

@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                String             @id @default(uuid()) @db.Uuid
+  name              String             @db.VarChar(120)
+  phone             String?            @unique @db.VarChar(20)
+  email             String?            @unique @db.VarChar(255)
+  googleId          String?            @unique @map("google_id") @db.VarChar(128)
+  avatarUrl         String?            @map("avatar_url") @db.VarChar(512)
+  authProvider      String             @default("phone") @map("auth_provider") @db.VarChar(20)
+  profileCompleted  Boolean            @default(false) @map("profile_completed")
+  plan              String             @default("Free Shield") @db.VarChar(50)
+  isActive          Boolean            @default(true) @map("is_active")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  transactions      Transaction[]
+  behaviourProfile  BehaviourProfile?
+  fraudLogs         FraudLog[]
+  preferences       UserPreference?
+  auditLogs         AuditLog[]
+
+  @@index([phone])
+  @@index([email])
+  @@index([googleId])
+  @@map("users")
+}
+
+model Merchant {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String        @db.VarChar(150)
+  upiId        String?       @unique @map("upi_id") @db.VarChar(120)
+  phone        String?       @db.VarChar(20)
+  category     String?       @db.VarChar(80)
+  trustScore   Float         @default(50) @map("trust_score")
+  reportCount  Int           @default(0) @map("report_count")
+  notes        String?
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  transactions Transaction[]
+
+  @@index([upiId])
+  @@index([phone])
+  @@map("merchants")
+}
+
+model Transaction {
+  id                     String    @id @default(uuid()) @db.Uuid
+  userId                 String    @map("user_id") @db.Uuid
+  merchantId             String?   @map("merchant_id") @db.Uuid
+  amount                 Decimal   @db.Decimal(12, 2)
+  currency               String    @default("INR") @db.VarChar(3)
+  channel                String    @db.VarChar(30)
+  reference              String?   @db.VarChar(255)
+  status                 String    @default("pending") @db.VarChar(20)
+  fraudScore             Float     @default(0) @map("fraud_score")
+  riskScore              Float     @default(0) @map("risk_score")
+  decision               String    @default("approve") @db.VarChar(20)
+  behaviourSnapshotJson  String?   @map("behaviour_snapshot_json")
+  ruleResultsJson        String?   @map("rule_results_json")
+  metadataJson           String?   @map("metadata_json")
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  merchant               Merchant? @relation(fields: [merchantId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, createdAt], map: "ix_transactions_user_id_created_at")
+  @@map("transactions")
+}
+
+model BehaviourProfile {
+  id                   String    @id @default(uuid()) @db.Uuid
+  userId               String    @unique @map("user_id") @db.Uuid
+  securityScore        Int       @default(75) @map("security_score")
+  threatsBlocked       Int       @default(0) @map("threats_blocked")
+  itemsScanned         Int       @default(0) @map("items_scanned")
+  safeItems            Int       @default(0) @map("safe_items")
+  avgTransactionAmount Float     @default(0) @map("avg_transaction_amount")
+  typicalChannels      String    @default("upi,qr") @map("typical_channels") @db.VarChar(120)
+  riskLevel            String    @default("low") @map("risk_level") @db.VarChar(20)
+  lastScanAt           DateTime? @map("last_scan_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("behaviour_profiles")
+}
+
+model FraudLog {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  transactionId String?   @map("transaction_id") @db.Uuid
+  alertType     String    @map("alert_type") @db.VarChar(50)
+  severity      String    @default("warning") @db.VarChar(20)
+  title         String    @db.VarChar(200)
+  description   String
+  source        String    @default("scanner") @db.VarChar(50)
+  fraudScore    Float     @default(0) @map("fraud_score")
+  isRead        Boolean   @default(false) @map("is_read")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("fraud_logs")
+}
+
+model DecisionLog {
+  id                   String   @id @default(uuid()) @db.Uuid
+  userId               String   @map("user_id") @db.Uuid
+  transactionId        String   @map("transaction_id") @db.Uuid
+  decision             String   @db.VarChar(20)
+  riskScore            Float    @map("risk_score")
+  fraudScore           Float    @map("fraud_score")
+  pipelineSnapshotJson String?  @map("pipeline_snapshot_json")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@index([transactionId])
+  @@map("decision_logs")
+}
+
+model UserPreference {
+  userId                String   @id @map("user_id") @db.Uuid
+  notificationsEnabled  Boolean  @default(true) @map("notifications_enabled")
+  pushAlerts            Boolean  @default(true) @map("push_alerts")
+  emailAlerts           Boolean  @default(false) @map("email_alerts")
+  smsAlerts             Boolean  @default(false) @map("sms_alerts")
+  aiSensitivity         String   @default("balanced") @map("ai_sensitivity") @db.VarChar(20)
+  privacyLevel          String   @default("standard") @map("privacy_level") @db.VarChar(20)
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model OtpCode {
+  phone     String   @id @db.VarChar(20)
+  code      String   @db.VarChar(8)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([expiresAt])
+  @@map("otp_codes")
+}
+
+model RevokedToken {
+  jti       String   @id @db.VarChar(64)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([expiresAt])
+  @@map("revoked_tokens")
+}
+
+model OAuthState {
+  state       String   @id @db.VarChar(128)
+  intent      String   @db.VarChar(20)
+  redirectUri String   @map("redirect_uri") @db.VarChar(512)
+  payloadJson String?  @map("payload_json")
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([expiresAt])
+  @@map("oauth_states")
+}
+
+/// Append-only fraud scan ledger — never update rows.
+model TransactionLedger {
+  id                String   @id @default(uuid()) @db.Uuid
+  transactionId     String   @map("transaction_id") @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  phoneNumber       String?  @map("phone_number") @db.VarChar(20)
+  upiId             String?  @map("upi_id") @db.VarChar(120)
+  fraudScore        Float    @map("fraud_score")
+  riskLevel         String   @map("risk_level") @db.VarChar(20)
+  status            String   @db.VarChar(20)
+  reason            String
+  modelVersion      String   @default("rf-v1") @map("model_version") @db.VarChar(40)
+  processingTimeMs  Int      @default(0) @map("processing_time_ms")
+  deviceId          String?  @map("device_id") @db.VarChar(128)
+  scanSource        String   @map("scan_source") @db.VarChar(20)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([transactionId])
+  @@index([userId])
+  @@index([phoneNumber])
+  @@index([upiId])
+  @@index([riskLevel])
+  @@index([status])
+  @@index([deviceId])
+  @@index([scanSource])
+  @@index([createdAt])
+  @@index([userId, createdAt], map: "ix_transaction_ledger_user_id_created_at")
+  @@map("transaction_ledger")
+}
+
+/// Append-only system audit trail — never update or delete rows.
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String?  @map("user_id") @db.Uuid
+  eventType     String   @map("event_type") @db.VarChar(64)
+  entityType    String?  @map("entity_type") @db.VarChar(64)
+  entityId      String?  @map("entity_id") @db.VarChar(64)
+  previousValue Json?    @map("previous_value")
+  newValue      Json?    @map("new_value")
+  ipAddress     String?  @map("ip_address") @db.VarChar(64)
+  device        String?  @db.VarChar(128)
+  platform      String?  @db.VarChar(64)
+  requestId     String?  @map("request_id") @db.VarChar(64)
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([requestId])
+  @@index([userId, createdAt], map: "ix_audit_logs_user_id_created_at")
+  @@index([eventType, createdAt], map: "ix_audit_logs_event_type_created_at")
+  @@index([entityType, entityId], map: "ix_audit_logs_entity")
+  @@map("audit_logs")
+}

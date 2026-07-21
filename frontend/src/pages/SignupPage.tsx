@@ -14,7 +14,6 @@ const DEFAULT_CONFIG: AuthConfig = {
   google_redirect_uri: '',
   sms_enabled: false,
   otp_delivery: 'console',
-  biometric_enabled: false,
 };
 
 export function SignupPage() {
@@ -49,7 +48,6 @@ export function SignupPage() {
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Get started with your mobile number or Google account."
       footer={{ text: 'Already have an account?', linkText: 'Sign in', linkTo: '/login' }}
     >
       <PhoneOtpAuth
@@ -64,18 +62,25 @@ export function SignupPage() {
         verifyLabel="Create account"
       />
 
-      <div className="my-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-white/[0.08]" />
-        <span className="text-xs text-slate-500">or</span>
-        <div className="h-px flex-1 bg-white/[0.08]" />
-      </div>
-
       {config?.google_enabled && (
-        <GoogleSignInButton
-          intent="signup"
-          disabled={loading}
-          onError={(message) => setError(message ?? 'Google sign-in failed')}
-        />
+        <>
+          <div className="my-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-white/[0.08]" />
+            <span className="text-xs text-slate-500">or</span>
+            <div className="h-px flex-1 bg-white/[0.08]" />
+          </div>
+          <GoogleSignInButton
+            intent="signup"
+            disabled={loading}
+            onError={(message) => setError(message ?? 'Google sign-in failed')}
+          />
+        </>
+      )}
+
+      {config && !config.sms_enabled && (
+        <p className="mt-4 text-center text-xs text-slate-500">
+          SMS delivery is in console mode — check the backend logs for your OTP when testing.
+        </p>
       )}
     </AuthShell>
   );

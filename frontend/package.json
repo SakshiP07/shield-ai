@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@react-oauth/google": "^0.13.5",
+    "@supabase/supabase-js": "^2.109.0",
     "framer-motion": "^12.42.2",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.23.0",

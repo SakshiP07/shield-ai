@@ -2,12 +2,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
-import redis
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.redis_client import RedisKeys, redis_client
+from app.models.revoked_token import RevokedToken
 
 settings = get_settings()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -28,24 +28,37 @@ def decode_access_token(token: str) -> dict[str, Any] | None:
         return None
 
 
-def is_access_token_revoked(payload: dict[str, Any]) -> bool:
+def _aware(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
+
+
+def is_access_token_revoked(db: Session, payload: dict[str, Any]) -> bool:
     jti = payload.get("jti")
     if not jti:
         return False
-    try:
-        return bool(redis_client.exists(RedisKeys.revoked_token(str(jti))))
-    except redis.RedisError:
-        # Fail open if Redis is temporarily unavailable — do not lock users out.
+    row = db.get(RevokedToken, str(jti))
+    if row is None:
         return False
+    if _aware(row.expires_at) < datetime.now(UTC):
+        db.delete(row)
+        db.commit()
+        return False
+    return True
 
 
-def revoke_access_token(token: str) -> bool:
+def revoke_access_token(db: Session, token: str) -> bool:
     payload = decode_access_token(token)
     if payload is None or not payload.get("jti"):
         return False
-    expires_at = int(payload.get("exp", 0))
-    ttl = max(expires_at - int(datetime.now(UTC).timestamp()), 1)
-    redis_client.setex(RedisKeys.revoked_token(str(payload["jti"])), ttl, "1")
+    expires_at = datetime.fromtimestamp(int(payload.get("exp", 0)), tz=UTC)
+    if expires_at <= datetime.now(UTC):
+        return False
+    existing = db.get(RevokedToken, str(payload["jti"]))
+    if existing is None:
+        db.add(RevokedToken(jti=str(payload["jti"]), expires_at=expires_at))
+        db.commit()
     return True
 
 

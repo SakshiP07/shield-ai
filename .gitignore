@@ -26,10 +26,18 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+backend/node_modules
+frontend/node_modules
 dist
+dist_ssr
 dist-ssr
 *.local
 .vite
+
+# Prisma (lives under backend/ only)
+backend/node_modules/.prisma
+**/prisma/*.db
+**/prisma/*.db-journal
 
 # Editor directories and files
 .vscode/*
@@ -41,3 +49,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local AI assistant skill caches (not part of the app)
+.agents/
+.claude/
+.windsurf/

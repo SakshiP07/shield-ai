@@ -7,13 +7,13 @@ type WsMessage =
   | { type: 'error'; message: string }
   | { type: 'pong' };
 
-function wsUrl(token: string): string {
+function wsUrl(): string {
   // Dev: connect straight to uvicorn — avoids Vite /ws proxy EPIPE spam on reconnect/reload.
   if (import.meta.env.DEV) {
-    return `ws://127.0.0.1:8000/ws/alerts?token=${encodeURIComponent(token)}`;
+    return 'ws://127.0.0.1:8000/ws/alerts';
   }
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}/ws/alerts?token=${encodeURIComponent(token)}`;
+  return `${protocol}//${window.location.host}/ws/alerts`;
 }
 
 export function useAlertsWebSocket(
@@ -62,13 +62,15 @@ export function useAlertsWebSocket(
       clearPing();
       detachSocket(ws);
       const attempt = ++connectAttempt;
-      ws = new WebSocket(wsUrl(token));
+      ws = new WebSocket(wsUrl());
 
       ws.onopen = () => {
         if (unmounted || attempt !== connectAttempt) {
           detachSocket(ws);
           return;
         }
+        // Send JWT after connect — never put tokens in the URL (uvicorn logs query strings).
+        ws?.send(JSON.stringify({ type: 'auth', token }));
         setConnected(true);
         pingTimer = setInterval(() => {
           if (ws?.readyState === WebSocket.OPEN) {

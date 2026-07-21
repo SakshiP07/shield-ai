@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { KeyRound, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { AuthShell } from '../components/auth/AuthShell';
 import { PhoneOtpAuth } from '../components/auth/PhoneOtpAuth';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useAuth } from '../hooks/AuthContext';
-import { useBiometricAuth } from '../hooks/useBiometricAuth';
 import { useToast } from '../hooks/ToastContext';
-import { ApiError, api, type AuthConfig } from '../lib/api';
-import { BiometricAuthError } from '../lib/biometric';
+import { api, type AuthConfig } from '../lib/api';
 
 const DEFAULT_CONFIG: AuthConfig = {
   google_enabled: false,
@@ -16,11 +14,10 @@ const DEFAULT_CONFIG: AuthConfig = {
   google_redirect_uri: '',
   sms_enabled: false,
   otp_delivery: 'console',
-  biometric_enabled: false,
 };
 
 export function LoginPage() {
-  const { user, loading: authLoading, sendOtp, verifyOtp, biometricLogin } = useAuth();
+  const { user, loading: authLoading, sendOtp, verifyOtp } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -30,12 +27,6 @@ export function LoginPage() {
   useEffect(() => {
     api.authConfig().then(setConfig).catch(() => setConfig(DEFAULT_CONFIG));
   }, []);
-
-  const {
-    canLoginWithBiometric,
-    probing: biometricProbing,
-    buttonLabel,
-  } = useBiometricAuth(Boolean(config?.biometric_enabled));
 
   if (authLoading) {
     return (
@@ -54,29 +45,10 @@ export function LoginPage() {
     navigate(needsProfile ? '/setup' : '/app');
   };
 
-  const handleBiometric = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const needsProfile = await biometricLogin();
-      afterAuth(needsProfile);
-    } catch (err) {
-      const msg =
-        err instanceof BiometricAuthError
-          ? err.message
-          : err instanceof ApiError
-            ? err.message
-            : 'Biometric sign-in failed';
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <AuthShell
       title="Welcome back"
-      subtitle="Sign in to continue protecting your payments."
+      subtitle="Sign in with your mobile number or Google."
       footer={{ text: "Don't have an account?", linkText: 'Sign up', linkTo: '/signup' }}
     >
       <PhoneOtpAuth
@@ -91,33 +63,26 @@ export function LoginPage() {
         verifyLabel="Sign in"
       />
 
-      <div className="my-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-white/[0.08]" />
-        <span className="text-xs text-slate-500">or</span>
-        <div className="h-px flex-1 bg-white/[0.08]" />
-      </div>
-
-      <div className="space-y-3">
-        {config?.google_enabled && (
+      {config?.google_enabled && (
+        <>
+          <div className="my-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-white/[0.08]" />
+            <span className="text-xs text-slate-500">or</span>
+            <div className="h-px flex-1 bg-white/[0.08]" />
+          </div>
           <GoogleSignInButton
             intent="login"
             disabled={loading}
             onError={(message) => setError(message ?? 'Google sign-in failed')}
           />
-        )}
+        </>
+      )}
 
-        {!biometricProbing && canLoginWithBiometric && (
-          <button
-            type="button"
-            onClick={handleBiometric}
-            disabled={loading}
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.08] bg-surface-input py-3.5 text-sm font-medium text-white transition hover:bg-white/[0.04] disabled:opacity-50"
-          >
-            <KeyRound className="h-4 w-4" />
-            {buttonLabel}
-          </button>
-        )}
-      </div>
+      {config && !config.sms_enabled && (
+        <p className="mt-4 text-center text-xs text-slate-500">
+          SMS delivery is in console mode — check the backend logs for your OTP when testing.
+        </p>
+      )}
     </AuthShell>
   );
 }

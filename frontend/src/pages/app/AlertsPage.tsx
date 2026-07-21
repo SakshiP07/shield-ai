@@ -1,219 +1,201 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Ban, Loader2, ShieldCheck, ShieldAlert, Wifi, WifiOff } from 'lucide-react';
-import { AlertDetailSheet } from '../../components/mobile/AlertDetailSheet';
-import { AlertStatusBadge } from '../../components/mobile/AlertStatusBadge';
+import { useCallback, useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react';
 import { MobilePage } from '../../components/mobile/MobilePage';
-import { useAlertsSocket } from '../../hooks/AlertsSocketContext';
-import { useToast } from '../../hooks/ToastContext';
-import { api, type AlertDetail, type AlertItem } from '../../lib/api';
-import { alertCardTitle, alertStatus, alertSummary } from '../../lib/alertDisplay';
-import { dateGroupLabel, formatDateLabel, formatTime } from '../../lib/format';
+import { api, type LedgerEntry } from '../../lib/api';
+import { formatTime } from '../../lib/format';
 
-type DateGroup = 'today' | 'yesterday' | 'earlier';
+type StatusFilter = '' | 'succeeded' | 'failed' | 'pending';
+type RiskFilter = '' | 'high' | 'medium' | 'low';
 
-function groupAlerts(alerts: AlertItem[]): { group: DateGroup; items: AlertItem[] }[] {
-  const buckets: Record<DateGroup, AlertItem[]> = { today: [], yesterday: [], earlier: [] };
-  for (const alert of alerts) {
-    buckets[formatDateLabel(alert.created_at)].push(alert);
-  }
-  return (['today', 'yesterday', 'earlier'] as const)
-    .filter((g) => buckets[g].length > 0)
-    .map((group) => ({ group, items: buckets[group] }));
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'succeeded', label: 'Success' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'pending', label: 'Pending' },
+];
+
+const RISK_FILTERS: { value: RiskFilter; label: string }[] = [
+  { value: '', label: 'All risk' },
+  { value: 'high', label: 'High Risk' },
+  { value: 'medium', label: 'Medium Risk' },
+  { value: 'low', label: 'Low Risk' },
+];
+
+function statusTone(status: string): string {
+  if (status === 'succeeded') return 'text-emerald-400 bg-emerald-500/10';
+  if (status === 'failed') return 'text-rose-400 bg-rose-500/10';
+  return 'text-amber-400 bg-amber-500/10';
 }
 
-function AlertIcon({ tone }: { tone: 'blocked' | 'review' | 'safe' }) {
-  if (tone === 'blocked') {
-    return (
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-500/10">
-        <Ban className="h-4 w-4 text-rose-400" />
-      </div>
-    );
-  }
-  if (tone === 'safe') {
-    return (
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500/10">
-        <ShieldCheck className="h-4 w-4 text-blue-400" />
-      </div>
-    );
-  }
-  return (
-    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500/10">
-      <ShieldAlert className="h-4 w-4 text-blue-400" />
-    </div>
-  );
+function riskTone(level: string): string {
+  if (level === 'high') return 'text-rose-400';
+  if (level === 'medium') return 'text-amber-400';
+  return 'text-blue-400';
 }
 
 export function AlertsPage() {
-  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [items, setItems] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<AlertDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const { showToast } = useToast();
-  const { connected, subscribe, refreshUnreadCount } = useAlertsSocket();
+  const [phone, setPhone] = useState('');
+  const [upi, setUpi] = useState('');
+  const [status, setStatus] = useState<StatusFilter>('');
+  const [riskLevel, setRiskLevel] = useState<RiskFilter>('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = 20;
 
-  const loadAlerts = () => {
-    api
-      .alerts()
-      .then(setAlerts)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadAlerts();
-  }, []);
-
-  useEffect(() => {
-    return subscribe((alert) => {
-      setAlerts((prev) => {
-        if (prev.some((a) => a.id === alert.id)) return prev;
-        return [alert, ...prev];
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.ledger({
+        phone: phone.trim() || undefined,
+        upi: upi.trim() || undefined,
+        status: status || undefined,
+        risk_level: riskLevel || undefined,
+        page,
+        page_size: pageSize,
       });
-    });
-  }, [subscribe]);
-
-  const grouped = useMemo(() => groupAlerts(alerts), [alerts]);
-  const unreadCount = alerts.filter((a) => !a.is_read).length;
-
-  const markAllRead = async () => {
-    try {
-      await api.markAllAlertsRead();
-      setAlerts((prev) => prev.map((a) => ({ ...a, is_read: true })));
-      refreshUnreadCount();
-      showToast('All alerts marked as read', 'success');
-    } catch {
-      showToast('Failed to mark alerts', 'error');
-    }
-  };
-
-  const openAlert = async (alert: AlertItem) => {
-    setSelectedId(alert.id);
-    setDetailLoading(true);
-    setDetail(null);
-
-    if (!alert.is_read) {
-      try {
-        await api.markAlertRead(alert.id);
-        setAlerts((prev) => prev.map((a) => (a.id === alert.id ? { ...a, is_read: true } : a)));
-        refreshUnreadCount();
-      } catch {
-        showToast('Failed to mark alert as read', 'error');
-      }
-    }
-
-    try {
-      const data = await api.alertDetail(alert.id);
-      setDetail(data);
-    } catch {
-      showToast('Could not load alert details', 'error');
-      setSelectedId(null);
+      setItems(res.items);
+      setTotal(res.total);
+      setTotalPages(res.total_pages);
+    } catch (err) {
+      console.error(err);
+      setItems([]);
+      setTotal(0);
+      setTotalPages(1);
     } finally {
-      setDetailLoading(false);
+      setLoading(false);
     }
-  };
+  }, [phone, upi, status, riskLevel, page]);
 
-  const closeDetail = () => {
-    setSelectedId(null);
-    setDetail(null);
-    setDetailLoading(false);
-  };
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    setPage(1);
+  }, [phone, upi, status, riskLevel]);
 
   return (
     <MobilePage>
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            {connected ? (
-              <Wifi className="h-4 w-4 text-blue-400" aria-label="Live alerts connected" />
-            ) : (
-              <WifiOff className="h-4 w-4 text-slate-500" aria-label="Live alerts disconnected" />
-            )}
-            <span className="text-[13px] text-slate-500">{connected ? 'Live' : 'Offline'}</span>
-          </div>
-          {unreadCount > 0 && (
-            <p className="mt-1.5 text-[15px] leading-relaxed text-slate-400">
-              {unreadCount} unread
-            </p>
-          )}
+      <div className="mb-5 space-y-3">
+        <p className="text-[13px] text-slate-500">Transaction ledger · newest first</p>
+
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="Search by phone number"
+            className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.03] py-3 pl-10 pr-4 text-[14px] text-white outline-none focus:border-blue-500/40"
+          />
         </div>
-        {alerts.length > 0 && (
-          <button
-            type="button"
-            onClick={markAllRead}
-            className="text-[13px] font-medium text-blue-400 transition hover:text-blue-300 active:opacity-70"
-          >
-            Mark all read
-          </button>
-        )}
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            value={upi}
+            onChange={(e) => setUpi(e.target.value)}
+            placeholder="Search by UPI ID"
+            className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.03] py-3 pl-10 pr-4 text-[14px] text-white outline-none focus:border-blue-500/40"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.label}
+              type="button"
+              onClick={() => setStatus(f.value)}
+              className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition ${
+                status === f.value
+                  ? 'bg-blue-500/20 text-blue-300'
+                  : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06]'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {RISK_FILTERS.map((f) => (
+            <button
+              key={f.label}
+              type="button"
+              onClick={() => setRiskLevel(f.value)}
+              className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition ${
+                riskLevel === f.value
+                  ? 'bg-blue-500/20 text-blue-300'
+                  : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06]'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {alerts.length === 0 ? (
-        <p className="text-[15px] leading-relaxed text-slate-500">No alerts yet.</p>
+      {loading ? (
+        <div className="flex min-h-[30vh] items-center justify-center">
+          <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
+        </div>
+      ) : items.length === 0 ? (
+        <p className="text-[15px] leading-relaxed text-slate-500">No ledger entries yet. Run a scan to append one.</p>
       ) : (
-        <div className="space-y-7">
-          {grouped.map(({ group, items }) => (
-            <section key={group}>
-              <h2 className="mb-3.5 text-[13px] font-medium uppercase tracking-wider text-slate-500">
-                {dateGroupLabel(group)}
-              </h2>
-              <div className="space-y-3">
-                {items.map((alert) => {
-                  const status = alertStatus(alert);
-                  const isUnread = !alert.is_read;
-                  const isSelected = selectedId === alert.id;
-
-                  return (
-                    <button
-                      key={alert.id}
-                      type="button"
-                      onClick={() => openAlert(alert)}
-                      className={`group w-full rounded-3xl px-5 py-4 text-left transition duration-200 active:scale-[0.99] ${
-                        isUnread
-                          ? 'bg-blue-500/[0.05] hover:bg-blue-500/[0.07]'
-                          : 'bg-white/[0.02] hover:bg-white/[0.04]'
-                      } ${isSelected ? 'bg-blue-500/[0.08]' : ''}`}
-                    >
-                      <div className="flex items-start gap-4">
-                        <AlertIcon tone={status.tone} />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2.5">
-                            <h3
-                              className={`min-w-0 flex-1 truncate text-[16px] font-semibold leading-[1.35] ${
-                                isUnread ? 'text-white' : 'text-slate-300'
-                              }`}
-                            >
-                              {alertCardTitle(alert.title)}
-                            </h3>
-                            <AlertStatusBadge label={status.label} tone={status.tone} />
-                          </div>
-                          <p className="mt-2.5 truncate text-[14px] leading-[1.45] text-slate-400">
-                            {alertSummary(alert.description)}
-                          </p>
-                          <p className="mt-2 text-[12px] leading-normal text-slate-500">
-                            {formatTime(alert.created_at)}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
+        <div className="space-y-3">
+          {items.map((entry) => (
+            <article key={entry.id} className="rounded-3xl bg-white/[0.03] px-5 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase ${statusTone(entry.status)}`}>
+                      {entry.status}
+                    </span>
+                    <span className={`text-[12px] font-medium uppercase ${riskTone(entry.risk_level)}`}>
+                      {entry.risk_level} risk
+                    </span>
+                    <span className="text-[12px] text-slate-500">{entry.scan_source}</span>
+                  </div>
+                  <p className="mt-2 truncate text-[15px] font-medium text-white">{entry.reason}</p>
+                  <p className="mt-1.5 text-[13px] text-slate-400">
+                    {entry.phone_number ? `Phone ${entry.phone_number}` : 'No phone'}
+                    {entry.upi_id ? ` · UPI ${entry.upi_id}` : ''}
+                  </p>
+                  <p className="mt-1 text-[12px] text-slate-500">
+                    Score {(entry.fraud_score * 100).toFixed(0)}% · {entry.processing_time_ms}ms · {entry.model_version}
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-600">
+                    Tx {entry.transaction_id.slice(0, 8)}… · {formatTime(entry.created_at)}
+                  </p>
+                </div>
               </div>
-            </section>
+            </article>
           ))}
         </div>
       )}
 
-      {(selectedId || detailLoading) && (
-        <AlertDetailSheet detail={detail} loading={detailLoading} onClose={closeDetail} />
+      {total > 0 && (
+        <div className="mt-6 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="inline-flex items-center gap-1 rounded-xl border border-white/[0.08] px-3 py-2 text-[13px] text-slate-300 disabled:opacity-40"
+          >
+            <ChevronLeft className="h-4 w-4" /> Prev
+          </button>
+          <p className="text-[13px] text-slate-500">
+            Page {page} / {totalPages} · {total} total
+          </p>
+          <button
+            type="button"
+            disabled={page >= totalPages || loading}
+            onClick={() => setPage((p) => p + 1)}
+            className="inline-flex items-center gap-1 rounded-xl border border-white/[0.08] px-3 py-2 text-[13px] text-slate-300 disabled:opacity-40"
+          >
+            Next <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       )}
     </MobilePage>
   );
