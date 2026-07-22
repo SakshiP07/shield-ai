@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy import Boolean, DateTime, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,12 +13,15 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    phone: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=True)
-    google_id: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=True)
-    avatar_url: Mapped[str] = mapped_column(String(512), nullable=True)
-    # phone | google | linked (both)
-    auth_provider: Mapped[str] = mapped_column(String(20), default="phone")
+    phone: Mapped[str | None] = mapped_column(String(20), unique=True, index=True, nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    google_id: Mapped[str | None] = mapped_column(String(128), unique=True, index=True, nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # password | google | linked | phone (legacy OTP-only)
+    auth_provider: Mapped[str] = mapped_column(String(20), default="password")
+    phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     profile_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     plan: Mapped[str] = mapped_column(String(50), default="Free Shield")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

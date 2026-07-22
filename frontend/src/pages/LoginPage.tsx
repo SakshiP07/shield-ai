@@ -1,36 +1,50 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { AuthShell } from '../components/auth/AuthShell';
-import { PhoneOtpAuth } from '../components/auth/PhoneOtpAuth';
-import { GoogleSignInButton } from '../components/GoogleSignInButton';
+import {
+  AuthError,
+  AuthFormStack,
+  AuthGoogleBlock,
+  AuthInput,
+  AuthPhoneInput,
+  AuthSubmitButton,
+} from '../components/auth/AuthFields';
 import { useAuth } from '../hooks/AuthContext';
 import { useToast } from '../hooks/ToastContext';
-import { api, type AuthConfig } from '../lib/api';
+import { api, ApiError, type AuthConfig } from '../lib/api';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 const DEFAULT_CONFIG: AuthConfig = {
-  google_enabled: false,
-  google_redirect_ready: false,
+  google_enabled: isSupabaseConfigured(),
+  google_redirect_ready: isSupabaseConfigured(),
   google_redirect_uri: '',
   sms_enabled: false,
   otp_delivery: 'console',
 };
 
 export function LoginPage() {
-  const { user, loading: authLoading, sendOtp, verifyOtp } = useAuth();
+  const { user, loading: authLoading, loginPassword } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [config, setConfig] = useState<AuthConfig | null>(null);
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+
+  const showGoogle = Boolean(config?.google_enabled ?? isSupabaseConfigured());
 
   useEffect(() => {
+    setPhone('');
+    setPassword('');
+    setError('');
     api.authConfig().then(setConfig).catch(() => setConfig(DEFAULT_CONFIG));
   }, []);
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-base">
+      <div className="flex min-h-screen items-center justify-center bg-shield">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     );
@@ -40,49 +54,64 @@ export function LoginPage() {
     return <Navigate to={user.profile_completed ? '/app' : '/setup'} replace />;
   }
 
-  const afterAuth = (needsProfile: boolean) => {
-    showToast('Welcome back', 'success');
-    navigate(needsProfile ? '/setup' : '/app');
+  const handleLogin = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const { needsProfile } = await loginPassword(phone, password);
+      showToast('Welcome back', 'success');
+      navigate(needsProfile ? '/setup' : '/app', { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Sign in failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <AuthShell
       title="Welcome back"
-      subtitle="Sign in with your mobile number or Google."
       footer={{ text: "Don't have an account?", linkText: 'Sign up', linkTo: '/signup' }}
     >
-      <PhoneOtpAuth
-        loading={loading}
-        error={error}
-        onError={setError}
-        onLoading={setLoading}
-        sendOtp={sendOtp}
-        verifyOtp={(phone, otp) => verifyOtp(phone, otp, 'login')}
-        onSuccess={afterAuth}
-        sendLabel="Send verification code"
-        verifyLabel="Sign in"
-      />
-
-      {config?.google_enabled && (
-        <>
-          <div className="my-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-white/[0.08]" />
-            <span className="text-xs text-slate-500">or</span>
-            <div className="h-px flex-1 bg-white/[0.08]" />
-          </div>
-          <GoogleSignInButton
+      <AuthFormStack>
+        {showGoogle && (
+          <AuthGoogleBlock
             intent="login"
             disabled={loading}
             onError={(message) => setError(message ?? 'Google sign-in failed')}
           />
-        </>
-      )}
+        )}
 
-      {config && !config.sms_enabled && (
-        <p className="mt-4 text-center text-xs text-slate-500">
-          SMS delivery is in console mode — check the backend logs for your OTP when testing.
-        </p>
-      )}
+        <form onSubmit={handleLogin} className="flex flex-col gap-3" autoComplete="on">
+          <AuthPhoneInput
+            id="login-phone"
+            value={phone}
+            onChange={setPhone}
+            required
+            disabled={loading}
+          />
+
+          <AuthInput
+            id="login-password"
+            name="password"
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+          />
+
+          <AuthError message={error} />
+
+          <AuthSubmitButton loading={loading} className="mt-1">
+            Sign in
+          </AuthSubmitButton>
+        </form>
+      </AuthFormStack>
     </AuthShell>
   );
 }

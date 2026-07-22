@@ -34,10 +34,13 @@ class AccountService:
     def sync_auth_provider(user: User) -> None:
         has_phone = bool(user.phone)
         has_google = bool(user.google_id)
-        if has_phone and has_google:
+        has_password = bool(user.hashed_password)
+        if has_google and (has_phone or has_password):
             user.auth_provider = "linked"
         elif has_google:
             user.auth_provider = "google"
+        elif has_password:
+            user.auth_provider = "password"
         elif has_phone:
             user.auth_provider = "phone"
 
@@ -70,6 +73,79 @@ class AccountService:
     def _ensure_profile(db: Session, user: User) -> None:
         if user.behaviour_profile is None:
             db.add(BehaviourProfile(user_id=user.id))
+
+    @staticmethod
+    def assert_email_available(db: Session, email: str) -> str:
+        normalized = AccountService._normalize_email(email)
+        if not normalized:
+            raise AccountLinkError("Email is required.", "invalid_email")
+        if AccountService.find_by_email(db, normalized):
+            raise AccountLinkError(
+                "An account already exists for this email. Sign in instead.",
+                "account_exists",
+            )
+        return normalized
+
+    @staticmethod
+    def assert_phone_available(db: Session, phone: str) -> str:
+        formatted = _format_phone(phone)
+        if AccountService.find_by_phone(db, phone):
+            raise AccountLinkError(
+                "An account already exists for this phone number. Sign in instead.",
+                "account_exists",
+            )
+        return formatted
+
+    @staticmethod
+    def create_password_user(
+        db: Session,
+        *,
+        name: str,
+        email: str,
+        phone: str,
+        hashed_password: str,
+    ) -> User:
+        formatted = _format_phone(phone)
+        normalized_email = AccountService._normalize_email(email)
+        user = User(
+            name=name.strip(),
+            email=normalized_email,
+            phone=formatted,
+            hashed_password=hashed_password,
+            auth_provider="password",
+            phone_verified=True,
+            email_verified=False,
+            profile_completed=True,
+            plan="Premium Shield",
+        )
+        try:
+            db.add(user)
+            db.flush()
+            AccountService._ensure_profile(db, user)
+            db.commit()
+            db.refresh(user)
+        except IntegrityError as exc:
+            db.rollback()
+            raise AccountLinkError(
+                "An account already exists for this email or phone number. Sign in instead.",
+                "account_exists",
+            ) from exc
+        logger.info("account_created method=password user_id=%s email=%s", user.id, normalized_email)
+        return user
+
+    @staticmethod
+    def authenticate_password(db: Session, phone: str, password: str) -> User:
+        from app.core.security import verify_password
+
+        user = AccountService.find_by_phone(db, phone)
+        if not user or not user.hashed_password:
+            raise AccountLinkError("Invalid phone number or password.", "invalid_credentials")
+        if not user.is_active:
+            raise AccountLinkError("This account has been deactivated.", "account_inactive")
+        if not verify_password(password, user.hashed_password):
+            raise AccountLinkError("Invalid phone number or password.", "invalid_credentials")
+        logger.info("account_login method=password user_id=%s", user.id)
+        return user
 
     @staticmethod
     def _create_phone_user(db: Session, phone: str) -> User:
@@ -115,6 +191,7 @@ class AccountService:
             user.name = name
         if user.name and user.name.strip():
             user.profile_completed = True
+        user.email_verified = True
         AccountService.sync_auth_provider(user)
 
     @staticmethod
@@ -133,6 +210,8 @@ class AccountService:
             google_id=google_id,
             avatar_url=picture,
             auth_provider="google",
+            email_verified=True,
+            phone_verified=False,
             profile_completed=True,
             plan="Premium Shield",
         )
@@ -199,10 +278,21 @@ class AccountService:
         return AccountService.login_or_register_phone(db, phone)
 
     @staticmethod
-    def link_phone(db: Session, user: User, phone: str) -> User:
-        """Attach verified phone to the logged-in account (same user id)."""
+    def link_phone(
+        db: Session,
+        user: User,
+        phone: str,
+        *,
+        hashed_password: str | None = None,
+    ) -> User:
+        """Attach verified phone (and optional password) to the logged-in account."""
         formatted = _format_phone(phone)
         if user.phone == formatted:
+            if hashed_password and not user.hashed_password:
+                user.hashed_password = hashed_password
+                AccountService.sync_auth_provider(user)
+                db.commit()
+                db.refresh(user)
             return user
 
         if user.phone:
@@ -216,6 +306,9 @@ class AccountService:
             )
 
         user.phone = formatted
+        user.phone_verified = True
+        if hashed_password:
+            user.hashed_password = hashed_password
         AccountService.sync_auth_provider(user)
         if user.name and user.name.strip():
             user.profile_completed = True

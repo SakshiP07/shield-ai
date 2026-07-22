@@ -66,6 +66,8 @@ export interface User {
   plan: string;
   profile_completed: boolean;
   auth_provider: string;
+  phone_verified?: boolean;
+  email_verified?: boolean;
 }
 
 export interface AuthResponse {
@@ -156,8 +158,45 @@ export interface UserPreferences {
   push_alerts: boolean;
   email_alerts: boolean;
   sms_alerts: boolean;
+  android_sms_connected: boolean;
   ai_sensitivity: string;
   privacy_level: string;
+}
+
+export interface AndroidSmsConnection {
+  connected: boolean;
+  platform: string;
+  ios_supported: boolean;
+}
+
+export interface AndroidSmsInboxItem {
+  id: string;
+  android_sms_id: string;
+  address: string;
+  phone_number: string;
+  sender: string;
+  body: string;
+  received_at: string;
+  timestamp: string;
+  is_read: boolean;
+  unread: boolean;
+  is_otp: boolean;
+  otp_code: string | null;
+  transaction_id: string | null;
+  fraud_score: number | null;
+  risk_score: number | null;
+  risk_level: string | null;
+  decision: string | null;
+  badge: string | null;
+}
+
+export interface AndroidSmsInboxResponse {
+  items: AndroidSmsInboxItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  connected: boolean;
 }
 
 export interface SmsScanItem {
@@ -232,6 +271,30 @@ function getOrCreateDeviceId(): string {
 export const api = {
   authConfig: () => request<AuthConfig>('/auth/config'),
 
+  signupStart: (data: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    confirm_password: string;
+  }) =>
+    request<OTPResponse>('/auth/signup/start', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  signupVerify: (phone: string, otp: string) =>
+    request<AuthResponse>('/auth/signup/verify', {
+      method: 'POST',
+      body: JSON.stringify({ phone, otp }),
+    }),
+
+  loginPassword: (phone: string, password: string) =>
+    request<AuthResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ phone, password }),
+    }),
+
   sendOtp: (phone: string) =>
     request<OTPResponse>('/auth/otp/send', { method: 'POST', body: JSON.stringify({ phone }) }),
 
@@ -253,10 +316,14 @@ export const api = {
       body: JSON.stringify({ phone }),
     }),
 
-  linkPhoneVerify: (phone: string, otp: string) =>
+  linkPhoneVerify: (
+    phone: string,
+    otp: string,
+    passwords?: { password: string; confirm_password: string },
+  ) =>
     request<User>('/auth/link/phone/verify', {
       method: 'POST',
-      body: JSON.stringify({ phone, otp }),
+      body: JSON.stringify({ phone, otp, ...passwords }),
     }),
 
   linkGoogle: (access_token: string) =>
@@ -369,6 +436,29 @@ export const api = {
   smsScans: () => request<SmsScanItem[]>('/sms/scans'),
 
   smsScanDetail: (id: string) => request<SmsScanDetail>(`/sms/scans/${id}`),
+
+  smsConnection: () => request<AndroidSmsConnection>('/sms/connection'),
+
+  smsConnect: () => request<AndroidSmsConnection>('/sms/connect', { method: 'POST' }),
+
+  smsDisconnect: () => request<AndroidSmsConnection>('/sms/disconnect', { method: 'POST' }),
+
+  smsInbox: (params: {
+    search?: string;
+    page?: number;
+    page_size?: number;
+    unread_only?: boolean;
+    otp_only?: boolean;
+  } = {}) => {
+    const q = new URLSearchParams();
+    if (params.search) q.set('search', params.search);
+    if (params.page) q.set('page', String(params.page));
+    if (params.page_size) q.set('page_size', String(params.page_size));
+    if (params.unread_only != null) q.set('unread_only', String(params.unread_only));
+    if (params.otp_only != null) q.set('otp_only', String(params.otp_only));
+    const qs = q.toString();
+    return request<AndroidSmsInboxResponse>(`/sms/inbox${qs ? `?${qs}` : ''}`);
+  },
 
   blockedScans: () => request<ActivityItem[]>('/dashboard/blocked-scans'),
 };

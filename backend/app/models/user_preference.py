@@ -18,6 +18,7 @@ class UserPreference(Base):
     push_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     email_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
     sms_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
+    android_sms_connected: Mapped[bool] = mapped_column(Boolean, default=False)
     ai_sensitivity: Mapped[str] = mapped_column(String(20), default="balanced")
     privacy_level: Mapped[str] = mapped_column(String(20), default="standard")
     updated_at: Mapped[datetime] = mapped_column(

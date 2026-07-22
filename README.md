@@ -72,6 +72,19 @@ Required for Supabase: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_RO
 - Redis, Docker, Google OAuth, WebAuthn/passkeys
 - Root-level Prisma / root `node_modules`
 
+## Android SMS app
+
+Native Android client lives in **`android/`** (Content Provider SMS sync — no Twilio).
+
+- Configure backend URL: `android/gradle.properties` → `API_BASE_URL` (override in `android/local.properties`)
+- Docs / run instructions: [`android/README.md`](android/README.md)
+
+```bash
+cd android
+# Open this folder in Android Studio, or:
+./gradlew :app:assembleDebug
+```
+
 ## License
 
 Private — all rights reserved.

@@ -16,12 +16,25 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   needsProfile: boolean;
+  signupStart: (data: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    confirm_password: string;
+  }) => Promise<{ message: string; sms_sent: boolean; dev_otp?: string | null }>;
+  signupVerify: (phone: string, otp: string) => Promise<{ needsProfile: boolean; isNewUser: boolean }>;
+  loginPassword: (phone: string, password: string) => Promise<{ needsProfile: boolean }>;
   sendOtp: (phone: string) => Promise<{ message: string; sms_sent: boolean; dev_otp?: string | null }>;
   verifyOtp: (phone: string, otp: string, intent?: 'login' | 'signup' | 'continue') => Promise<boolean>;
   googleLogin: (accessToken: string) => Promise<{ needsProfile: boolean; isNewUser: boolean }>;
   linkPhone: {
     sendOtp: (phone: string) => Promise<{ message: string; dev_otp?: string | null }>;
-    verify: (phone: string, otp: string) => Promise<void>;
+    verify: (
+      phone: string,
+      otp: string,
+      passwords?: { password: string; confirm_password: string },
+    ) => Promise<void>;
   };
   linkGoogle: (accessToken: string) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -73,6 +86,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const signupStart = useCallback(
+    async (data: {
+      name: string;
+      email: string;
+      phone: string;
+      password: string;
+      confirm_password: string;
+    }) => {
+      const digits = data.phone.replace(/\D/g, '');
+      if (digits.length < 10) throw new Error('Enter a valid 10-digit phone number');
+      const res = await api.signupStart({ ...data, phone: digits });
+      return { message: res.message, sms_sent: res.sms_sent, dev_otp: res.dev_otp };
+    },
+    [],
+  );
+
+  const signupVerify = useCallback(async (phone: string, otp: string) => {
+    const digits = phone.replace(/\D/g, '');
+    const res = await api.signupVerify(digits, otp);
+    const token = res.access_token || res.token;
+    if (!token) throw new Error('Signup did not return a session token');
+    setToken(token);
+    setUser(res.user);
+    setNeedsProfile(res.needs_profile);
+    return { needsProfile: res.needs_profile, isNewUser: Boolean(res.isNewUser) };
+  }, []);
+
+  const loginPassword = useCallback(async (phone: string, password: string) => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 10) throw new Error('Enter a valid 10-digit phone number');
+    const res = await api.loginPassword(digits, password);
+    const token = res.access_token || res.token;
+    if (!token) throw new Error('Login did not return a session token');
+    setToken(token);
+    setUser(res.user);
+    setNeedsProfile(res.needs_profile);
+    return { needsProfile: res.needs_profile };
+  }, []);
+
   const sendOtp = useCallback(async (phone: string) => {
     const digits = phone.replace(/\D/g, '');
     if (digits.length < 10) throw new Error('Enter a valid 10-digit phone number');
@@ -106,9 +158,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await api.linkPhoneSendOtp(digits);
         return { message: res.message, dev_otp: res.dev_otp };
       },
-      verify: async (phone: string, otp: string) => {
+      verify: async (
+        phone: string,
+        otp: string,
+        passwords?: { password: string; confirm_password: string },
+      ) => {
         const digits = phone.replace(/\D/g, '');
-        const updated = await api.linkPhoneVerify(digits, otp);
+        const updated = await api.linkPhoneVerify(digits, otp, passwords);
         setUser(updated);
       },
     }),
@@ -159,6 +215,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       needsProfile,
+      signupStart,
+      signupVerify,
+      loginPassword,
       sendOtp,
       verifyOtp,
       googleLogin,
@@ -174,6 +233,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       needsProfile,
+      signupStart,
+      signupVerify,
+      loginPassword,
       sendOtp,
       verifyOtp,
       googleLogin,

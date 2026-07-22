@@ -60,6 +60,10 @@
     background-color: var(--color-surface-card);
   }
 
+  .bg-gradient-icon {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  }
+
   .btn-touch {
     min-height: 44px;
     min-width: 44px;
@@ -73,6 +77,44 @@
 
   .btn-primary {
     @apply flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-blue-600 px-5 text-[15px] font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60;
+  }
+
+  /* ── Shared auth design system (Login + Signup) ───────────────────── */
+  .auth-control {
+    @apply h-12 w-full rounded-xl border border-white/[0.08] bg-surface-input px-3.5 text-sm text-white outline-none transition;
+    @apply placeholder:text-slate-500;
+    @apply hover:border-white/[0.12];
+    @apply focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/40;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .auth-btn-primary {
+    @apply flex h-12 w-full items-center justify-center rounded-xl bg-blue-600 px-5 text-[15px] font-semibold text-white outline-none transition;
+    @apply hover:bg-blue-500;
+    @apply focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-shield;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .auth-btn-google {
+    @apply flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/[0.08] bg-surface-input px-5 text-sm font-medium text-white outline-none transition;
+    @apply hover:border-white/[0.12] hover:bg-white/[0.04];
+    @apply focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-shield;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .auth-field {
+    color-scheme: dark;
+  }
+
+  .auth-field:-webkit-autofill,
+  .auth-field:-webkit-autofill:hover,
+  .auth-field:-webkit-autofill:focus,
+  .auth-field:-webkit-autofill:active {
+    -webkit-text-fill-color: #ffffff !important;
+    caret-color: #ffffff;
+    transition: background-color 99999s ease-in-out 0s;
+    box-shadow: 0 0 0 1000px #141414 inset !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
   }
 
   .scrollbar-none {

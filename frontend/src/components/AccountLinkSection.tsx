@@ -12,6 +12,8 @@ export function AccountLinkSection({ user }: AccountLinkSectionProps) {
   const { linkPhone } = useAuth();
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,12 +45,22 @@ export function AccountLinkSection({ user }: AccountLinkSectionProps) {
   };
 
   const verifyOtp = async () => {
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      await linkPhone.verify(phone, otp);
+      await linkPhone.verify(phone, otp, { password, confirm_password: confirmPassword });
       setOtpSent(false);
       setOtp('');
+      setPassword('');
+      setConfirmPassword('');
       setDevOtp(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to verify OTP');
@@ -70,7 +82,7 @@ export function AccountLinkSection({ user }: AccountLinkSectionProps) {
               <div className="flex gap-2">
                 <input
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   placeholder="10-digit phone"
                   className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-white outline-none"
                 />
@@ -87,8 +99,22 @@ export function AccountLinkSection({ user }: AccountLinkSectionProps) {
               <div className="space-y-2">
                 <input
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="Enter OTP"
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-white outline-none"
+                />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create password (min 8)"
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-white outline-none"
+                />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm password"
                   className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-white outline-none"
                 />
                 {devOtp && <p className="text-xs text-slate-500">Dev OTP: {devOtp}</p>}

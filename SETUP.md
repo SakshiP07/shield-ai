@@ -59,12 +59,17 @@ Open http://localhost:5173
 
 ## Auth
 
-- **Phone OTP** — signup/login by phone; Google never required
-- **Google via Supabase Auth** — `signInWithOAuth({ provider: 'google' })`, then `POST /api/v1/auth/google` with the Supabase access token
-- Google is always **find-or-create / link-by-email** (login and signup use the same path; first-time Google users are created automatically)
-- **Link later** — Profile can attach the missing method to the **same** user row (`auth_provider`: `phone` | `google` | `linked`)
+One person → one `users` row. Google and phone/password can both live on the same account.
 
-Lookup order: `google_id` → `email` → create (phone linking uses phone on the logged-in user).
+- **Email/phone signup** — name + email + phone + password → OTP verify → user created (`POST /auth/signup/start`, `/auth/signup/verify`)
+- **Phone login** — phone + password (`POST /auth/login`) against the same account
+- **Google via Supabase Auth** — `signInWithOAuth({ provider: 'google' })`, then `POST /api/v1/auth/google` with the Supabase access token
+- Google is always **find-or-create / link-by-email** (never “no account exists”)
+- **Link later** — Profile can attach phone (+ optional password) or Google to the **same** user row (`auth_provider`: `password` | `google` | `linked`)
+
+Lookup order: `google_id` → `email` → create.
+
+DB migration for password columns + `pending_signups`: run `backend/scripts/migrate-password-auth.sql` in the Supabase SQL editor.
 
 ### Supabase dashboard checklist
 

@@ -50,6 +50,16 @@ backend/node_modules/.prisma
 *.sln
 *.sw?
 
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.cxx/
+*.apk
+*.aab
+*.iml
+
 # Local AI assistant skill caches (not part of the app)
 .agents/
 .claude/

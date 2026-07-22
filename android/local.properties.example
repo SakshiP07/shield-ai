@@ -1,0 +1,13 @@
+## Copy to local.properties and adjust. This file is an example only.
+## local.properties is gitignored and used for machine-specific config.
+
+# Android SDK (Android Studio usually writes this automatically)
+# sdk.dir=/Users/YOU/Library/Android/sdk
+
+# Optional override of the FastAPI base URL (wins over gradle.properties)
+# Emulator:
+# API_BASE_URL=http://10.0.2.2:8000/api/v1/
+# Physical device (replace with your Mac/PC LAN IP):
+# API_BASE_URL=http://192.168.1.20:8000/api/v1/
+# Production:
+# API_BASE_URL=https://api.your-domain.com/api/v1/

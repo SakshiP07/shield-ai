@@ -19,20 +19,28 @@ class PreferenceService:
     @staticmethod
     def update(db: Session, user: User, updates: dict) -> UserPreference:
         prefs = PreferenceService.get_or_create(db, user)
-        previous_sms = prefs.sms_alerts
+        previous_android = prefs.android_sms_connected
         for key, value in updates.items():
             if value is not None and hasattr(prefs, key):
                 setattr(prefs, key, value)
 
-        if "sms_alerts" in updates and updates["sms_alerts"] is not None and updates["sms_alerts"] != previous_sms:
+        if (
+            "android_sms_connected" in updates
+            and updates["android_sms_connected"] is not None
+            and updates["android_sms_connected"] != previous_android
+        ):
             AuditService.append(
                 db,
-                event_type=AuditEventType.SMS_CONNECTED if prefs.sms_alerts else AuditEventType.SMS_DISCONNECTED,
+                event_type=(
+                    AuditEventType.SMS_CONNECTED
+                    if prefs.android_sms_connected
+                    else AuditEventType.SMS_DISCONNECTED
+                ),
                 user_id=user.id,
-                entity_type="user_preference",
+                entity_type="android_sms",
                 entity_id=user.id,
-                previous_value={"sms_alerts": previous_sms},
-                new_value={"sms_alerts": prefs.sms_alerts},
+                previous_value={"android_sms_connected": previous_android},
+                new_value={"android_sms_connected": prefs.android_sms_connected},
             )
 
         db.commit()

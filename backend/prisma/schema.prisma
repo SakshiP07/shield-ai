@@ -11,9 +11,12 @@ model User {
   name              String             @db.VarChar(120)
   phone             String?            @unique @db.VarChar(20)
   email             String?            @unique @db.VarChar(255)
+  hashedPassword    String?            @map("hashed_password") @db.VarChar(255)
   googleId          String?            @unique @map("google_id") @db.VarChar(128)
   avatarUrl         String?            @map("avatar_url") @db.VarChar(512)
-  authProvider      String             @default("phone") @map("auth_provider") @db.VarChar(20)
+  authProvider      String             @default("password") @map("auth_provider") @db.VarChar(20)
+  phoneVerified     Boolean            @default(false) @map("phone_verified")
+  emailVerified     Boolean            @default(false) @map("email_verified")
   profileCompleted  Boolean            @default(false) @map("profile_completed")
   plan              String             @default("Free Shield") @db.VarChar(50)
   isActive          Boolean            @default(true) @map("is_active")
@@ -24,11 +27,25 @@ model User {
   fraudLogs         FraudLog[]
   preferences       UserPreference?
   auditLogs         AuditLog[]
+  smsMessages       SmsMessage[]
 
   @@index([phone])
   @@index([email])
   @@index([googleId])
   @@map("users")
+}
+
+model PendingSignup {
+  phone          String   @id @db.VarChar(20)
+  name           String   @db.VarChar(120)
+  email          String   @db.VarChar(255)
+  hashedPassword String   @map("hashed_password") @db.VarChar(255)
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([expiresAt])
+  @@index([email])
+  @@map("pending_signups")
 }
 
 model Merchant {
@@ -130,6 +147,7 @@ model UserPreference {
   pushAlerts            Boolean  @default(true) @map("push_alerts")
   emailAlerts           Boolean  @default(false) @map("email_alerts")
   smsAlerts             Boolean  @default(false) @map("sms_alerts")
+  androidSmsConnected   Boolean  @default(false) @map("android_sms_connected")
   aiSensitivity         String   @default("balanced") @map("ai_sensitivity") @db.VarChar(20)
   privacyLevel          String   @default("standard") @map("privacy_level") @db.VarChar(20)
   updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -214,14 +232,46 @@ model AuditLog {
   requestId     String?  @map("request_id") @db.VarChar(64)
   userAgent     String?  @map("user_agent")
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // Match Postgres default FK (ON DELETE SET NULL, ON UPDATE NO ACTION) to avoid db push DropForeignKey timeouts.
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
-  @@index([userId])
-  @@index([eventType])
-  @@index([createdAt])
-  @@index([requestId])
+  @@index([userId], map: "ix_audit_logs_user_id")
+  @@index([eventType], map: "ix_audit_logs_event_type")
+  @@index([createdAt], map: "ix_audit_logs_created_at")
+  @@index([requestId], map: "ix_audit_logs_request_id")
   @@index([userId, createdAt], map: "ix_audit_logs_user_id_created_at")
   @@index([eventType, createdAt], map: "ix_audit_logs_event_type_created_at")
   @@index([entityType, entityId], map: "ix_audit_logs_entity")
   @@map("audit_logs")
+}
+
+/// Android SMS Content Provider sync (no Twilio / third-party SMS gateways).
+model SmsMessage {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  androidSmsId  String    @map("android_sms_id") @db.VarChar(64)
+  address       String    @db.VarChar(64)
+  sender        String    @db.VarChar(120)
+  body          String
+  receivedAt    DateTime  @map("received_at") @db.Timestamptz(6)
+  isRead        Boolean   @default(false) @map("is_read")
+  isOtp         Boolean   @default(false) @map("is_otp")
+  otpCode       String?   @map("otp_code") @db.VarChar(16)
+  threadId      String?   @map("thread_id") @db.VarChar(64)
+  transactionId String?   @map("transaction_id") @db.Uuid
+  fraudScore    Float?    @map("fraud_score")
+  riskScore     Float?    @map("risk_score")
+  riskLevel     String?   @map("risk_level") @db.VarChar(30)
+  decision      String?   @db.VarChar(30)
+  badge         String?   @db.VarChar(20)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, androidSmsId], map: "uq_sms_messages_user_android_id")
+  @@index([userId])
+  @@index([receivedAt])
+  @@index([userId, receivedAt], map: "ix_sms_messages_user_id_received_at")
+  @@index([userId, isRead], map: "ix_sms_messages_user_id_is_read")
+  @@map("sms_messages")
 }
