@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, dashboard, ledger, scans, websocket
+from app.api.routes import android_sms, audit_logs, auth, dashboard, ledger, scans, websocket
 from app.core.config import get_settings
 from app.core.database import Base, engine
 from app.core.request_context import AuditContextMiddleware
@@ -15,7 +15,9 @@ from app.models import (  # noqa: F401
     merchant,
     oauth_state,
     otp_code,
+    pending_signup,
     revoked_token,
+    sms_message,
     transaction,
     transaction_ledger,
     user,
@@ -46,7 +48,9 @@ api_prefix = settings.api_v1_prefix
 app.include_router(auth.router, prefix=api_prefix)
 app.include_router(dashboard.router, prefix=api_prefix)
 app.include_router(scans.router, prefix=api_prefix)
+app.include_router(android_sms.router, prefix=api_prefix)
 app.include_router(ledger.router, prefix=api_prefix)
+app.include_router(audit_logs.router, prefix=api_prefix)
 app.include_router(websocket.router)
 
 

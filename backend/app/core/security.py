@@ -2,15 +2,14 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.revoked_token import RevokedToken
 
 settings = get_settings()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> str:
@@ -62,9 +61,18 @@ def revoke_access_token(db: Session, token: str) -> bool:
     return True
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
-
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    digest = bcrypt.hashpw(password.encode("utf-8")[:72], bcrypt.gensalt())
+    return digest.decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    if not hashed_password:
+        return False
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8")[:72],
+            hashed_password.encode("utf-8"),
+        )
+    except (ValueError, TypeError):
+        return False

@@ -14,6 +14,10 @@ from app.schemas.auth import (
     OTPRequest,
     OTPResponse,
     OTPVerify,
+    LinkPhoneVerifyRequest,
+    PasswordSignupStartRequest,
+    PasswordSignupVerifyRequest,
+    PhonePasswordLoginRequest,
     ProfileUpdate,
     UserResponse,
 )
@@ -33,17 +37,56 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _account_error_status(exc: AccountLinkError) -> int:
-    # account_not_found is only used for phone login now; Google never emits it.
-    if exc.code == "account_not_found":
+    if exc.code in {"account_not_found", "signup_expired"}:
         return status.HTTP_404_NOT_FOUND
     if exc.code == "account_inactive":
         return status.HTTP_403_FORBIDDEN
+    if exc.code == "invalid_credentials":
+        return status.HTTP_401_UNAUTHORIZED
     return status.HTTP_409_CONFLICT
 
 
 @router.get("/config", response_model=AuthConfigResponse)
 def auth_config() -> AuthConfigResponse:
     return AuthController.auth_config()
+
+
+@router.post("/signup/start", response_model=OTPResponse)
+def signup_start(payload: PasswordSignupStartRequest, db: Session = Depends(get_db)) -> OTPResponse:
+    try:
+        return AuthController.signup_start(payload, db)
+    except InvalidPhoneError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except AccountLinkError as exc:
+        raise HTTPException(status_code=_account_error_status(exc), detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/signup/verify", response_model=AuthResponse)
+def signup_verify(payload: PasswordSignupVerifyRequest, db: Session = Depends(get_db)) -> AuthResponse:
+    try:
+        return AuthController.signup_verify(payload, db)
+    except InvalidPhoneError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except InvalidOtpError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except OtpExpiredError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+    except OtpMismatchError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+    except AccountLinkError as exc:
+        raise HTTPException(status_code=_account_error_status(exc), detail=str(exc)) from exc
+
+
+@router.post("/login", response_model=AuthResponse)
+def login_password(payload: PhonePasswordLoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
+    try:
+        return AuthController.login_password(payload, db)
+    except InvalidPhoneError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except AccountLinkError as exc:
+        raise HTTPException(status_code=_account_error_status(exc), detail=str(exc)) from exc
 
 
 @router.post("/otp/send", response_model=OTPResponse)
@@ -105,7 +148,7 @@ def link_phone_send_otp(
 
 @router.post("/link/phone/verify", response_model=UserResponse)
 def link_phone_verify(
-    payload: OTPVerify,
+    payload: LinkPhoneVerifyRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> UserResponse:
@@ -121,6 +164,8 @@ def link_phone_verify(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
     except AccountLinkError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/link/google", response_model=UserResponse)

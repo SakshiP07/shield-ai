@@ -32,6 +32,42 @@ from app.services.transaction_helpers import find_merchant, get_or_create_profil
 from app.services.velocity import check_velocity
 
 
+def _short_text(value: str | None, limit: int = 48) -> str:
+    text = " ".join((value or "").strip().split())
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def transaction_subject(
+    *,
+    scan_type: str,
+    content: str,
+    merchant: Merchant | None,
+    amount: float,
+    sender: str | None,
+) -> str:
+    """Human-readable counterparty / payload so alerts are not all identical."""
+    if merchant and merchant.name:
+        base = merchant.name
+    elif scan_type == "sms" and sender:
+        base = sender
+    elif scan_type == "upi":
+        base = extract_upi_id(content) or _short_text(content, 40) or "UPI payment"
+    elif scan_type == "phone":
+        base = extract_phone(content) or _short_text(content, 20) or "Phone number"
+    elif scan_type == "qr":
+        base = _short_text(content, 48) or "QR code"
+    elif scan_type == "sms":
+        base = _short_text(content, 56) or "SMS"
+    else:
+        base = _short_text(content, 48) or scan_type.upper()
+
+    if amount > 0:
+        return f"{base} · ₹{amount:,.0f}"
+    return base
+
+
 def process_transaction(
     db: Session,
     user: User,
@@ -41,6 +77,7 @@ def process_transaction(
     amount: Decimal | None = None,
     device_info: dict | None = None,
     sender: str | None = None,
+    append_ledger: bool = True,
 ) -> dict:
     started = time.perf_counter()
     profile = get_or_create_profile(db, user)
@@ -79,8 +116,19 @@ def process_transaction(
         behaviour_deviation=behaviour.deviation_score,
     )
 
+    # Apply user AI sensitivity preference (standard = fewer alerts, high = stricter).
+    from app.services.preference_service import PreferenceService
+
+    prefs = PreferenceService.get_or_create(db, user)
+    sensitivity = (prefs.ai_sensitivity or "balanced").lower()
+    adjusted_risk = float(risk.risk_score)
+    if sensitivity == "high":
+        adjusted_risk = min(100.0, adjusted_risk + 12.0)
+    elif sensitivity == "standard":
+        adjusted_risk = max(0.0, adjusted_risk - 12.0)
+
     # Stage 5: Decision Engine
-    decision = decide(risk_score=risk.risk_score, any_high_severity_rule=rules.any_high_severity)
+    decision = decide(risk_score=adjusted_risk, any_high_severity_rule=rules.any_high_severity)
 
     # Persist transaction
     metadata = dict(device_info or {})
@@ -126,42 +174,54 @@ def process_transaction(
         )
     )
 
+    subject = transaction_subject(
+        scan_type=scan_type,
+        content=content,
+        merchant=merchant,
+        amount=amount_val,
+        sender=sender,
+    )
+    channel_label = scan_type.upper()
+
     alert: FraudLog | None = None
-    if decision.action != "approve":
+    # Pro Threat Center: only raise alerts for real threats (block / hold).
+    # OTP step-ups and approvals stay in SMS / scan history — they are not alerts.
+    if decision.action in ("block", "hold"):
         title_map = {
-            "otp": "Step-up verification required",
-            "hold": "Transaction held for review",
-            "block": "Transaction blocked",
+            "hold": f"Review needed · {subject}",
+            "block": f"Threat blocked · {subject}",
         }
         alert = FraudLog(
             user_id=user.id,
             transaction_id=tx.id,
-            alert_type=f"{scan_type}_scan",
+            alert_type=f"{scan_type}_threat",
             severity=decision.status,
-            title=title_map.get(decision.action, "Fraud alert"),
-            description=f"[{decision.action.upper()}] {decision.reason} — {content[:100]}",
+            title=title_map.get(decision.action, f"Threat · {subject}")[:200],
+            description=f"[{decision.action.upper()}] {decision.reason} — {subject} — {_short_text(content, 100)}",
             source="pipeline",
             fraud_score=ml_score,
         )
         db.add(alert)
 
-    # Append-only ledger entry (never updates existing rows)
+    # Append-only ledger entry (never updates existing rows).
+    # For SMS: only bank / card / UPI / wallet / transaction / suspicious types.
     processing_ms = int((time.perf_counter() - started) * 1000)
-    append_ledger_entry(
-        db,
-        transaction_id=tx.id,
-        user_id=user.id,
-        phone_number=extract_phone(content, user.phone),
-        upi_id=extract_upi_id(content, merchant.upi_id if merchant else None),
-        fraud_score=ml_score,
-        risk_level=risk.level,
-        status=map_outcome_status(decision.action),
-        reason=decision.reason,
-        processing_time_ms=processing_ms,
-        device_id=extract_device_id(device_info),
-        scan_source=map_scan_source(scan_type),
-        model_version=MODEL_VERSION,
-    )
+    if append_ledger:
+        append_ledger_entry(
+            db,
+            transaction_id=tx.id,
+            user_id=user.id,
+            phone_number=extract_phone(content, user.phone),
+            upi_id=extract_upi_id(content, merchant.upi_id if merchant else None),
+            fraud_score=ml_score,
+            risk_level=risk.level,
+            status=map_outcome_status(decision.action),
+            reason=f"[{channel_label}] {decision.reason} — {subject}"[:2000],
+            processing_time_ms=processing_ms,
+            device_id=extract_device_id(device_info),
+            scan_source=map_scan_source(scan_type),
+            model_version=MODEL_VERSION,
+        )
 
     # Update behaviour profile
     profile.items_scanned += 1
@@ -254,6 +314,8 @@ def process_transaction(
         "requires_otp": decision.requires_otp,
         "transaction_id": tx.id,
         "alert_id": alert.id if alert else None,
+        "confidence": round(min(1.0, max(0.0, abs(float(ml_score) - 0.5) * 2)), 4),
+        "processing_time_ms": processing_ms,
         "pipeline": {
             "behaviour": behaviour.to_dict(),
             "rules": rules.to_dict(),

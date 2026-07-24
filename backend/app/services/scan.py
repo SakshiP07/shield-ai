@@ -15,6 +15,7 @@ def analyze_scan(
     amount: Decimal | None = None,
     device_info: dict | None = None,
     sender: str | None = None,
+    append_ledger: bool = True,
 ) -> dict:
     return process_transaction(
         db,
@@ -24,4 +25,5 @@ def analyze_scan(
         amount=amount,
         device_info=device_info,
         sender=sender,
+        append_ledger=append_ledger,
     )

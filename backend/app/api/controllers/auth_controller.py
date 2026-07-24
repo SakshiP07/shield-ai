@@ -1,26 +1,40 @@
+from datetime import UTC, datetime, timedelta
+
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.security import create_access_token
+from app.core.security import create_access_token, hash_password
+from app.models.pending_signup import PendingSignup
 from app.models.user import User
 from app.schemas.auth import (
     AuthConfigResponse,
     AuthResponse,
     GoogleAuthRequest,
+    LinkPhoneVerifyRequest,
     OTPRequest,
     OTPResponse,
     OTPVerify,
+    PasswordSignupStartRequest,
+    PasswordSignupVerifyRequest,
+    PhonePasswordLoginRequest,
     ProfileUpdate,
     UserResponse,
 )
-from app.services.account_service import AccountService
+from app.services.account_service import AccountLinkError, AccountService
 from app.services.audit_service import AuditEventType, AuditService
 from app.services.otp import OtpService
+from app.services.phone_service import format_phone
 from app.services.storage_service import StorageService
 from app.services.supabase_auth import verify_supabase_google_user
 
 settings = get_settings()
 otp_service = OtpService()
+
+
+def _aware(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
 
 
 class AuthController:
@@ -35,6 +49,96 @@ class AuthController:
         )
 
     @staticmethod
+    def signup_start(payload: PasswordSignupStartRequest, db: Session) -> OTPResponse:
+        email = AccountService.assert_email_available(db, payload.email)
+        phone = AccountService.assert_phone_available(db, payload.phone)
+
+        # Also block if another pending signup holds this email
+        existing_pending_email = (
+            db.query(PendingSignup).filter(PendingSignup.email == email).first()
+        )
+        if existing_pending_email and existing_pending_email.phone != phone:
+            if _aware(existing_pending_email.expires_at) > datetime.now(UTC):
+                raise AccountLinkError(
+                    "An account already exists for this email. Sign in instead.",
+                    "account_exists",
+                )
+
+        hashed = hash_password(payload.password)
+        expires_at = datetime.now(UTC) + timedelta(seconds=settings.otp_expire_seconds)
+        pending = PendingSignup(
+            phone=phone,
+            name=payload.name.strip(),
+            email=email,
+            hashed_password=hashed,
+            expires_at=expires_at,
+        )
+        db.merge(pending)
+        db.commit()
+
+        result = otp_service.send_otp(db, payload.phone)
+        return OTPResponse(
+            message=result.delivery.message,
+            expires_in=result.expires_in,
+            sms_sent=result.delivery.sent,
+            delivery_channel=result.delivery.channel,
+            dev_otp=result.dev_otp if settings.debug else None,
+        )
+
+    @staticmethod
+    def signup_verify(payload: PasswordSignupVerifyRequest, db: Session) -> AuthResponse:
+        phone = otp_service.verify_otp(db, payload.phone, payload.otp)
+        formatted = format_phone(phone)
+        pending = db.get(PendingSignup, formatted)
+        if pending is None or _aware(pending.expires_at) < datetime.now(UTC):
+            raise AccountLinkError(
+                "Signup session expired. Please start again.",
+                "signup_expired",
+            )
+
+        # Re-check uniqueness right before create
+        if AccountService.find_by_email(db, pending.email) or AccountService.find_by_phone(db, phone):
+            db.delete(pending)
+            db.commit()
+            raise AccountLinkError(
+                "An account already exists for this email or phone number. Sign in instead.",
+                "account_exists",
+            )
+
+        user = AccountService.create_password_user(
+            db,
+            name=pending.name,
+            email=pending.email,
+            phone=phone,
+            hashed_password=pending.hashed_password,
+        )
+        db.delete(pending)
+        AuditService.append(
+            db,
+            event_type=AuditEventType.LOGIN,
+            user_id=user.id,
+            entity_type="user",
+            entity_id=user.id,
+            new_value={"method": "password_signup", "phone": user.phone, "email": user.email},
+        )
+        db.commit()
+        return AuthController._issue_session(user, is_new_user=True)
+
+    @staticmethod
+    def login_password(payload: PhonePasswordLoginRequest, db: Session) -> AuthResponse:
+        user = AccountService.authenticate_password(db, payload.phone, payload.password)
+        AuditService.append(
+            db,
+            event_type=AuditEventType.LOGIN,
+            user_id=user.id,
+            entity_type="user",
+            entity_id=user.id,
+            new_value={"method": "password", "phone": user.phone},
+        )
+        db.commit()
+        return AuthController._issue_session(user)
+
+    @staticmethod
     def send_otp(payload: OTPRequest, db: Session) -> OTPResponse:
         result = otp_service.send_otp(db, payload.phone)
         return OTPResponse(
@@ -47,6 +151,7 @@ class AuthController:
 
     @staticmethod
     def verify_otp(payload: OTPVerify, db: Session) -> AuthResponse:
+        """Legacy phone-OTP auth (kept for account linking helpers)."""
         phone = otp_service.verify_otp(db, payload.phone, payload.otp)
         user = AccountService.authenticate_phone(db, phone, payload.intent)
         AuditService.append(
@@ -55,7 +160,7 @@ class AuthController:
             user_id=user.id,
             entity_type="user",
             entity_id=user.id,
-            new_value={"method": "phone", "phone": user.phone, "intent": payload.intent},
+            new_value={"method": "phone_otp", "phone": user.phone, "intent": payload.intent},
         )
         db.commit()
         return AuthController._issue_session(user)
@@ -72,7 +177,6 @@ class AuthController:
         if not google_id:
             raise ValueError("Invalid Google token")
 
-        # Always find-or-create / link-by-email. Never reject with "create an account first".
         user, is_new = AccountService.authenticate_google(
             db,
             intent="continue",
@@ -110,9 +214,10 @@ class AuthController:
         )
 
     @staticmethod
-    def link_phone_verify(payload: OTPVerify, user: User, db: Session) -> UserResponse:
+    def link_phone_verify(payload: LinkPhoneVerifyRequest, user: User, db: Session) -> UserResponse:
         phone = otp_service.verify_otp(db, payload.phone, payload.otp)
-        linked = AccountService.link_phone(db, user, phone)
+        hashed = hash_password(payload.password) if payload.password else None
+        linked = AccountService.link_phone(db, user, phone, hashed_password=hashed)
         return UserResponse.model_validate(linked)
 
     @staticmethod
@@ -144,6 +249,7 @@ class AuthController:
             "name": user.name,
             "avatar_url": user.avatar_url,
             "profile_completed": user.profile_completed,
+            "plan": user.plan,
         }
         if payload.name is not None:
             user.name = payload.name.strip()
@@ -153,12 +259,15 @@ class AuthController:
             if user.avatar_url and user.avatar_url != new_url:
                 StorageService.delete_by_url(user.avatar_url)
             user.avatar_url = new_url
-        if payload.name is None and payload.avatar_url is None:
+        if payload.plan is not None:
+            user.plan = payload.plan
+        if payload.name is None and payload.avatar_url is None and payload.plan is None:
             raise ValueError("At least one field must be provided")
         new_value = {
             "name": user.name,
             "avatar_url": user.avatar_url,
             "profile_completed": user.profile_completed,
+            "plan": user.plan,
         }
         AuditService.append(
             db,

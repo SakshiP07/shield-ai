@@ -42,7 +42,8 @@ def _fetch_supabase_user(access_token: str) -> dict:
     url = f"{settings.supabase_url.rstrip('/')}/auth/v1/user"
     last_error = "Invalid or expired Supabase session"
 
-    with httpx.Client(timeout=20.0) as client:
+    with httpx.Client(timeout=6.0) as client:
+        # Prefer anon key first (same as mobile client) — one round-trip.
         for api_key in api_keys:
             response = client.get(
                 url,
@@ -63,6 +64,9 @@ def _fetch_supabase_user(access_token: str) -> dict:
                 response.status_code,
                 last_error,
             )
+            # Don't retry with service role on 401 — token is bad
+            if response.status_code in (401, 403):
+                break
 
     raise ValueError("Invalid or expired Supabase session")
 

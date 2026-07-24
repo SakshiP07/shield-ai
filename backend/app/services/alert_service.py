@@ -1,11 +1,22 @@
 import json
 from uuid import UUID
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.decision_log import DecisionLog
 from app.models.fraud_log import FraudLog
 from app.models.transaction import Transaction
+
+
+def _threat_filter():
+    """Only surface real threats in the Pro Alerts feed (not OTP noise / safe scans)."""
+    return or_(
+        FraudLog.severity.in_(("blocked", "danger")),
+        FraudLog.description.ilike("[BLOCK]%"),
+        FraudLog.description.ilike("[HOLD]%"),
+        FraudLog.alert_type.ilike("%_threat"),
+    )
 
 
 class AlertService:
@@ -14,6 +25,9 @@ class AlertService:
         return (
             db.query(FraudLog)
             .filter(FraudLog.user_id == user_id)
+            .filter(_threat_filter())
+            .filter(~FraudLog.description.ilike("[OTP]%"))
+            .filter(~FraudLog.description.ilike("[APPROVE]%"))
             .order_by(FraudLog.created_at.desc())
             .limit(limit)
             .all()
@@ -24,6 +38,8 @@ class AlertService:
         return (
             db.query(FraudLog)
             .filter(FraudLog.user_id == user_id, FraudLog.is_read.is_(False))
+            .filter(_threat_filter())
+            .filter(~FraudLog.description.ilike("[OTP]%"))
             .count()
         )
 
@@ -46,7 +62,8 @@ class AlertService:
         count = (
             db.query(FraudLog)
             .filter(FraudLog.user_id == user_id, FraudLog.is_read.is_(False))
-            .update({"is_read": True})
+            .filter(_threat_filter())
+            .update({"is_read": True}, synchronize_session=False)
         )
         db.commit()
         return count
