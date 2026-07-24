@@ -31,3 +31,11 @@ CREATE INDEX IF NOT EXISTS ix_sms_messages_user_id ON sms_messages (user_id);
 CREATE INDEX IF NOT EXISTS ix_sms_messages_received_at ON sms_messages (received_at);
 CREATE INDEX IF NOT EXISTS ix_sms_messages_user_id_received_at ON sms_messages (user_id, received_at);
 CREATE INDEX IF NOT EXISTS ix_sms_messages_user_id_is_read ON sms_messages (user_id, is_read);
+
+ALTER TABLE sms_messages
+    ADD COLUMN IF NOT EXISTS sms_type VARCHAR(30),
+    ADD COLUMN IF NOT EXISTS folder VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS confidence DOUBLE PRECISION,
+    ADD COLUMN IF NOT EXISTS processing_time_ms INTEGER;
+
+

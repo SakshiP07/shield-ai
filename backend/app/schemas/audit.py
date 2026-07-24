@@ -21,6 +21,17 @@ class AuditLogEntry(BaseModel):
     user: AuditLogUser | None = None
     timestamp: datetime = Field(description="When the audit event was recorded")
     event_type: str
+    action: str | None = None
+    description: str | None = None
+    sms_id: str | None = None
+    transaction_id: UUID | None = None
+    status: str | None = None
+    metadata: dict[str, Any] | None = None
+    device_id: str | None = None
+    device_model: str | None = None
+    manufacturer: str | None = None
+    android_version: str | None = None
+    app_version: str | None = None
     entity_type: str | None = None
     entity_id: str | None = None
     previous_value: dict[str, Any] | None = None

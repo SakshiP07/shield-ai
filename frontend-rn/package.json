@@ -1,0 +1,46 @@
+{
+  "name": "frontend-rn",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/bottom-tabs": "^7.18.13",
+    "@react-navigation/native": "^7.3.13",
+    "@react-navigation/native-stack": "^7.18.5",
+    "@supabase/supabase-js": "^2.110.8",
+    "expo": "^54.0.36",
+    "expo-auth-session": "~7.0.11",
+    "expo-camera": "~17.0.10",
+    "expo-constants": "~18.0.13",
+    "expo-crypto": "~15.0.9",
+    "expo-image-picker": "~17.0.11",
+    "expo-modules-core": "~3.0.29",
+    "expo-status-bar": "~3.0.9",
+    "expo-web-browser": "~15.0.11",
+    "js-sha256": "^0.12.0",
+    "lucide-react-native": "^1.25.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-get-random-values": "~1.11.0",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
+    "shield-android-sms": "file:./modules/shield-android-sms"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2"
+  },
+  "scripts": {
+    "start": "ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools expo start --dev-client",
+    "start:lan": "REACT_NATIVE_PACKAGER_HOSTNAME=10.240.244.95 ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools expo start --dev-client --host lan",
+    "android:reverse": "bash scripts/adb-reverse-metro.sh",
+    "ensure-android-sdk": "bash scripts/ensure-android-sdk.sh",
+    "prebuild": "ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools expo prebuild --platform android",
+    "android": "ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web"
+  },
+  "private": true
+}

@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["ai.shield.sms.ShieldAndroidSmsModule"]
+  }
+}

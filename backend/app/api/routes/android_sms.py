@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+import logging
 
 from app.api.deps import get_current_user
 from app.api.routes.websocket import broadcast_alert
@@ -8,9 +10,12 @@ from app.core.database import get_db
 from app.models.fraud_log import FraudLog
 from app.models.user import User
 from app.schemas.android_sms import (
+    AndroidSmsClientAuditRequest,
+    AndroidSmsConnectRequest,
     AndroidSmsConnectionResponse,
     AndroidSmsInboxItem,
     AndroidSmsInboxResponse,
+    AndroidSmsIngestItem,
     AndroidSmsIngestRequest,
     AndroidSmsIngestResponse,
     AndroidSmsIngestResultItem,
@@ -19,6 +24,7 @@ from app.services.android_sms_service import AndroidSmsService
 from uuid import UUID
 
 router = APIRouter(prefix="/sms", tags=["android-sms"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/connection", response_model=AndroidSmsConnectionResponse)
@@ -31,20 +37,49 @@ def sms_connection(
 
 @router.post("/connect", response_model=AndroidSmsConnectionResponse)
 def sms_connect(
+    payload: AndroidSmsConnectRequest | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AndroidSmsConnectionResponse:
     """Mark Android SMS inbox as connected (READ_SMS granted on device)."""
-    return AndroidSmsConnectionResponse(**AndroidSmsService.connect(db, user))
+    device_info = payload.device_info if payload else None
+    return AndroidSmsConnectionResponse(
+        **AndroidSmsService.connect(db, user, device_info=device_info)
+    )
 
 
 @router.post("/disconnect", response_model=AndroidSmsConnectionResponse)
 def sms_disconnect(
+    payload: AndroidSmsConnectRequest | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AndroidSmsConnectionResponse:
     """Disconnect Android SMS sync (observer should stop on device)."""
-    return AndroidSmsConnectionResponse(**AndroidSmsService.disconnect(db, user))
+    device_info = payload.device_info if payload else None
+    return AndroidSmsConnectionResponse(
+        **AndroidSmsService.disconnect(db, user, device_info=device_info)
+    )
+
+
+@router.post("/client-audit", status_code=status.HTTP_204_NO_CONTENT)
+def sms_client_audit(
+    payload: AndroidSmsClientAuditRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Append-only audit events emitted by the React Native Android client."""
+    try:
+        AndroidSmsService.record_client_event(
+            db,
+            user,
+            event_type=payload.event_type,
+            description=payload.description,
+            metadata=payload.metadata,
+            sms_id=payload.sms_id,
+            status=payload.status or "success",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/ingest", response_model=AndroidSmsIngestResponse)
@@ -54,11 +89,29 @@ async def sms_ingest(
     db: Session = Depends(get_db),
 ) -> AndroidSmsIngestResponse:
     """Receive parsed SMS from Android Content Provider and auto-scan via fraud pipeline."""
+    valid_messages: list[AndroidSmsIngestItem] = []
+    for index, raw in enumerate(payload.messages):
+        try:
+            valid_messages.append(AndroidSmsIngestItem.model_validate(raw))
+        except ValidationError as exc:
+            logger.warning(
+                "sms_ingest skip invalid message[%s] user=%s: %s",
+                index,
+                user.id,
+                exc.errors(),
+            )
+
+    if not valid_messages:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid SMS messages in payload",
+        )
+
     try:
         result = AndroidSmsService.ingest(
             db,
             user,
-            [m.model_dump() for m in payload.messages],
+            [m.model_dump() for m in valid_messages],
             device_info=payload.device_info,
             auto_scan=payload.auto_scan,
         )
@@ -68,7 +121,6 @@ async def sms_ingest(
             detail="Failed to ingest SMS messages",
         ) from exc
 
-    # Broadcast any newly created fraud alerts
     for item in result.get("items", []):
         tx_id = item.get("transaction_id")
         if not tx_id:
@@ -97,6 +149,8 @@ def sms_inbox(
     search: str | None = Query(default=None, max_length=255),
     unread_only: bool | None = Query(default=None),
     otp_only: bool | None = Query(default=None),
+    sms_type: str | None = Query(default=None, max_length=30),
+    badge: str | None = Query(default=None, max_length=20),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> AndroidSmsInboxResponse:
@@ -109,6 +163,8 @@ def sms_inbox(
             search=search,
             unread_only=unread_only,
             otp_only=otp_only,
+            sms_type=sms_type,
+            badge=badge,
             page=page,
             page_size=page_size,
         )
@@ -133,10 +189,13 @@ def sms_inbox(
             unread=not row.is_read,
             is_otp=row.is_otp,
             otp_code=row.otp_code,
+            sms_type=row.sms_type,
             transaction_id=row.transaction_id,
             fraud_score=row.fraud_score,
             risk_score=row.risk_score,
             risk_level=row.risk_level,
+            confidence=row.confidence,
+            processing_time_ms=row.processing_time_ms,
             decision=row.decision,
             badge=row.badge,
         )

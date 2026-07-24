@@ -249,6 +249,7 @@ class AuthController:
             "name": user.name,
             "avatar_url": user.avatar_url,
             "profile_completed": user.profile_completed,
+            "plan": user.plan,
         }
         if payload.name is not None:
             user.name = payload.name.strip()
@@ -258,12 +259,15 @@ class AuthController:
             if user.avatar_url and user.avatar_url != new_url:
                 StorageService.delete_by_url(user.avatar_url)
             user.avatar_url = new_url
-        if payload.name is None and payload.avatar_url is None:
+        if payload.plan is not None:
+            user.plan = payload.plan
+        if payload.name is None and payload.avatar_url is None and payload.plan is None:
             raise ValueError("At least one field must be provided")
         new_value = {
             "name": user.name,
             "avatar_url": user.avatar_url,
             "profile_completed": user.profile_completed,
+            "plan": user.plan,
         }
         AuditService.append(
             db,

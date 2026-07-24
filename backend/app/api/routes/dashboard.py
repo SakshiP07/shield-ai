@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
@@ -13,6 +13,34 @@ from app.services.transaction_helpers import get_or_create_profile
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
+def _short_ref(value: str | None, limit: int = 40) -> str:
+    text = " ".join((value or "").strip().split())
+    if not text:
+        return ""
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def _activity_from_tx(tx: Transaction) -> dict:
+    channel = (tx.channel or "scan").upper()
+    snippet = _short_ref(tx.reference)
+    if tx.merchant and tx.merchant.name:
+        title = f"{channel} · {tx.merchant.name} — {tx.status}"
+    elif snippet:
+        title = f"{channel} · {snippet} — {tx.status}"
+    else:
+        title = f"{channel} scan — {tx.status}"
+    return {
+        "id": tx.id,
+        "title": title,
+        "time": tx.created_at,
+        "amount": tx.amount if tx.amount and tx.amount > 0 else None,
+        "sub": tx.reference,
+        "badge": tx.status,
+    }
+
+
 @router.get("/stats", response_model=DashboardStats)
 def dashboard_stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> DashboardStats:
     profile = get_or_create_profile(db, user)
@@ -23,6 +51,7 @@ def dashboard_stats(user: User = Depends(get_current_user), db: Session = Depend
 def recent_activity(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[ActivityItem]:
     txs = (
         db.query(Transaction)
+        .options(joinedload(Transaction.merchant))
         .filter(Transaction.user_id == user.id)
         .order_by(Transaction.created_at.desc())
         .limit(20)
@@ -30,19 +59,7 @@ def recent_activity(user: User = Depends(get_current_user), db: Session = Depend
     )
     items: list[ActivityItem] = []
     for tx in txs:
-        title = f"{tx.channel.upper()} scan — {tx.status}"
-        if tx.merchant:
-            title = f"Payment to {tx.merchant.name} — {tx.status}"
-        items.append(
-            ActivityItem(
-                id=tx.id,
-                title=title,
-                time=tx.created_at,
-                amount=tx.amount if tx.amount > 0 else None,
-                sub=tx.reference,
-                badge=tx.status,
-            )
-        )
+        items.append(ActivityItem(**_activity_from_tx(tx)))
     return items
 
 
@@ -50,6 +67,7 @@ def recent_activity(user: User = Depends(get_current_user), db: Session = Depend
 def blocked_scans(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[ActivityItem]:
     txs = (
         db.query(Transaction)
+        .options(joinedload(Transaction.merchant))
         .filter(
             Transaction.user_id == user.id,
             Transaction.decision.in_(["block", "hold"]),
@@ -60,19 +78,7 @@ def blocked_scans(user: User = Depends(get_current_user), db: Session = Depends(
     )
     items: list[ActivityItem] = []
     for tx in txs:
-        title = f"{tx.channel.upper()} scan — {tx.status}"
-        if tx.merchant:
-            title = f"Payment to {tx.merchant.name} — {tx.status}"
-        items.append(
-            ActivityItem(
-                id=tx.id,
-                title=title,
-                time=tx.created_at,
-                amount=tx.amount if tx.amount > 0 else None,
-                sub=tx.reference,
-                badge=tx.status,
-            )
-        )
+        items.append(ActivityItem(**_activity_from_tx(tx)))
     return items
 
 

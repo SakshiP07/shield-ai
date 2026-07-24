@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     otp_expire_seconds: int = 300
     otp_length: int = 6
-    otp_delivery: str = "console"  # console | msg91
+    otp_delivery: str = "console"  # console | msg91 | twilio | auto
 
     phone_country_code: str = "91"
     phone_number_length: int = 10

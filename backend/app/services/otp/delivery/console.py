@@ -13,11 +13,12 @@ class ConsoleOtpDelivery:
 
     def send_otp(self, phone: str, otp: str) -> OtpDeliveryResult:
         e164 = to_e164(phone)
-        logger.info(
-            "OTP generated | phone=%s | otp=%s | expires_in=%ds",
+        logger.warning(
+            "\n=========================================\n"
+            "DEV OTP GENERATED | phone=%s | otp=%s\n"
+            "=========================================",
             e164,
             otp,
-            settings.otp_expire_seconds,
         )
         return OtpDeliveryResult(
             sent=False,

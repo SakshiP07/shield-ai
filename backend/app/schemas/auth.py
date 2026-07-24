@@ -116,6 +116,7 @@ class AuthResponse(BaseModel):
 class ProfileUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=120)
     avatar_url: str | None = Field(default=None, max_length=512)
+    plan: str | None = Field(default=None, max_length=50)
 
     @field_validator("name")
     @classmethod
@@ -126,6 +127,17 @@ class ProfileUpdate(BaseModel):
         if len(value) < 2:
             raise ValueError("Name must contain at least 2 non-space characters")
         return value
+
+    @field_validator("plan")
+    @classmethod
+    def validate_plan(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        allowed = {"Free Shield", "Premium Shield"}
+        cleaned = value.strip()
+        if cleaned not in allowed:
+            raise ValueError(f"Plan must be one of: {', '.join(sorted(allowed))}")
+        return cleaned
 
 
 class GoogleAuthRequest(BaseModel):

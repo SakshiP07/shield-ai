@@ -17,6 +17,9 @@ class AuditLog(Base):
         Index("ix_audit_logs_event_type_created_at", "event_type", "created_at"),
         Index("ix_audit_logs_entity", "entity_type", "entity_id"),
         Index("ix_audit_logs_request_id", "request_id"),
+        Index("ix_audit_logs_sms_id", "sms_id"),
+        Index("ix_audit_logs_transaction_id", "transaction_id"),
+        Index("ix_audit_logs_status", "status"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -24,6 +27,19 @@ class AuditLog(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    # Prompt-aligned SMS audit fields (nullable for legacy rows).
+    action: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sms_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    transaction_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    status: Mapped[str | None] = mapped_column(String(32), nullable=True, default="success")
+    metadata_json: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
+    device_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    device_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    manufacturer: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    android_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    app_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Legacy entity linkage (still used by non-SMS events).
     entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     entity_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     previous_value: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

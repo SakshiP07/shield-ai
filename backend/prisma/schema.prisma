@@ -219,21 +219,32 @@ model TransactionLedger {
 
 /// Append-only system audit trail — never update or delete rows.
 model AuditLog {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String?  @map("user_id") @db.Uuid
-  eventType     String   @map("event_type") @db.VarChar(64)
-  entityType    String?  @map("entity_type") @db.VarChar(64)
-  entityId      String?  @map("entity_id") @db.VarChar(64)
-  previousValue Json?    @map("previous_value")
-  newValue      Json?    @map("new_value")
-  ipAddress     String?  @map("ip_address") @db.VarChar(64)
-  device        String?  @db.VarChar(128)
-  platform      String?  @db.VarChar(64)
-  requestId     String?  @map("request_id") @db.VarChar(64)
-  userAgent     String?  @map("user_agent")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String?   @map("user_id") @db.Uuid
+  eventType       String    @map("event_type") @db.VarChar(64)
+  action          String?   @db.VarChar(120)
+  description     String?
+  smsId           String?   @map("sms_id") @db.VarChar(64)
+  transactionId   String?   @map("transaction_id") @db.Uuid
+  status          String?   @db.VarChar(32)
+  metadata        Json?
+  deviceId        String?   @map("device_id") @db.VarChar(128)
+  deviceModel     String?   @map("device_model") @db.VarChar(128)
+  manufacturer    String?   @db.VarChar(128)
+  androidVersion  String?   @map("android_version") @db.VarChar(32)
+  appVersion      String?   @map("app_version") @db.VarChar(32)
+  entityType      String?   @map("entity_type") @db.VarChar(64)
+  entityId        String?   @map("entity_id") @db.VarChar(64)
+  previousValue   Json?     @map("previous_value")
+  newValue        Json?     @map("new_value")
+  ipAddress       String?   @map("ip_address") @db.VarChar(64)
+  device          String?   @db.VarChar(128)
+  platform        String?   @db.VarChar(64)
+  requestId       String?   @map("request_id") @db.VarChar(64)
+  userAgent       String?   @map("user_agent")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   // Match Postgres default FK (ON DELETE SET NULL, ON UPDATE NO ACTION) to avoid db push DropForeignKey timeouts.
-  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([userId], map: "ix_audit_logs_user_id")
   @@index([eventType], map: "ix_audit_logs_event_type")
@@ -242,6 +253,9 @@ model AuditLog {
   @@index([userId, createdAt], map: "ix_audit_logs_user_id_created_at")
   @@index([eventType, createdAt], map: "ix_audit_logs_event_type_created_at")
   @@index([entityType, entityId], map: "ix_audit_logs_entity")
+  @@index([smsId], map: "ix_audit_logs_sms_id")
+  @@index([transactionId], map: "ix_audit_logs_transaction_id")
+  @@index([status], map: "ix_audit_logs_status")
   @@map("audit_logs")
 }
 
@@ -259,11 +273,15 @@ model SmsMessage {
   otpCode       String?   @map("otp_code") @db.VarChar(16)
   threadId      String?   @map("thread_id") @db.VarChar(64)
   transactionId String?   @map("transaction_id") @db.Uuid
-  fraudScore    Float?    @map("fraud_score")
-  riskScore     Float?    @map("risk_score")
-  riskLevel     String?   @map("risk_level") @db.VarChar(30)
-  decision      String?   @db.VarChar(30)
-  badge         String?   @db.VarChar(20)
+  fraudScore        Float?    @map("fraud_score")
+  riskScore         Float?    @map("risk_score")
+  riskLevel         String?   @map("risk_level") @db.VarChar(30)
+  confidence        Float?
+  processingTimeMs  Int?      @map("processing_time_ms")
+  decision          String?   @db.VarChar(30)
+  badge             String?   @db.VarChar(20)
+  smsType           String?   @map("sms_type") @db.VarChar(30)
+  folder            String?   @db.VarChar(20)
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
